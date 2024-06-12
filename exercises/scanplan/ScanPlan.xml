@@ -1,0 +1,75 @@
+<ScanPlanSetup test="abc">    
+
+  <ExerciceLength Value="1" />
+  <Slide Id="Material" set="Steel" />
+  <Slide Id="Thickness" set="25" />
+  <Slide Id="WeldType" set="V" />
+  <Slide Id="TopCap" set="15" />
+  <Slide Id="BottomCap" set="5" />
+ 
+  <Slide Id="NumberProbe" set="1" answer="2" />  
+  <Slide Id="Probe1" set=" " answer="A12 5L32" />
+  <Slide Id="Wedge1" set=" " answer="SA12 N55S" />
+  <Slide Id="Skew1" set="90°" answer="90°" />
+  <Slide Id="ScanOffset1" set="0" answer="0" />
+  <Slide Id="IndexOffset1" set="0" answer="-15" />
+  <Slide Id="Probe2" set=" " answer="A12 5L32" />
+  <Slide Id="Wedge2" set=" " answer="SA12 N55S" />
+  <Slide Id="Skew2" set="270°" answer="90°" />
+  <Slide Id="ScanOffset2" set="0" answer="0" />
+  <Slide Id="IndexOffset2" set="0" answer="15" />
+  <Slide Id="NumberScan" set="1" answer="2" />
+  
+  <Slide Id="Gain" set="0" answer="20" />
+  <Slide Id="FilterSonde1" set=" " answer="5" />
+  <Slide Id="FilterSonde2" set=" " answer="5" />
+  
+  <Slide Id="WaveType1_1" set=" " answer="Shear" />
+  <Slide Id="TypeScan1_1" set=" " answer="S-Scan" />
+  <Slide Id="FirstElement1_1" set="1" answer="12" />
+  <Slide Id="NumberElement1_1" set="8" answer="16" />
+  <Slide Id="StartAngle1_1" set="45" answer="35" />
+  <Slide Id="StopAngle1_1" set="55" answer="70" />
+  <Slide Id="AngularReso1_1" set="1" answer="1" />
+  <Slide Id="FocusDepth1_1" set="1000" answer="50" />
+  <Slide Id="StartRange1_1" set="0" answer="10" />
+  <Slide Id="RangeRange1_1" set="0" answer="60" />  
+  
+  <Slide Id="WaveType1_2" set=" " answer="Shear" />
+  <Slide Id="TypeScan1_2" set=" " answer="S-Scan" />
+  <Slide Id="FirstElement1_2" set="1" answer="12" />
+  <Slide Id="NumberElement1_2" set="8" answer="16" />
+  <Slide Id="StartAngle1_2" set="45" answer="35" />
+  <Slide Id="StopAngle1_2" set="55" answer="70" />
+  <Slide Id="AngularReso1_2" set="1" answer="1" />
+  <Slide Id="FocusDepth1_2" set="1000" answer="50" />
+  <Slide Id="StartRange1_2" set="0" answer="10" />
+  <Slide Id="RangeRange1_2" set="0" answer="60" />
+  
+  <Slide Id="WaveType2_1" set=" " answer="Shear" />
+  <Slide Id="TypeScan2_1" set=" " answer="S-Scan" />
+  <Slide Id="FirstElement2_1" set="1" answer="12" />
+  <Slide Id="NumberElement2_1" set="8" answer="16" />
+  <Slide Id="StartAngle2_1" set="45" answer="35" />
+  <Slide Id="StopAngle2_1" set="55" answer="70" />
+  <Slide Id="AngularReso2_1" set="1" answer="1" />
+  <Slide Id="FocusDepth2_1" set="1000" answer="50" />
+  <Slide Id="StartRange2_1" set="0" answer="10" />
+  <Slide Id="RangeRange2_1" set="0" answer="60" />
+  
+  <Slide Id="WaveType2_2" set=" " answer="Shear" />
+  <Slide Id="TypeScan2_2" set=" " answer="S-Scan" />
+  <Slide Id="FirstElement2_2" set="1" answer="12" />
+  <Slide Id="NumberElement2_2" set="8" answer="16" />
+  <Slide Id="StartAngle2_2" set="45" answer="35" />
+  <Slide Id="StopAngle2_2" set="55" answer="70" />
+  <Slide Id="AngularReso2_2" set="1" answer="1" />
+  <Slide Id="FocusDepth2_2" answer="50" />
+  <Slide Id="StartRange2_2" set="0" answer="10" />
+  <Slide Id="RangeRange2_2" set="0" answer="60" />
+  
+ 
+  <Slide Id="ScanningResolution" set=" " answer="1" />
+  <Slide Id="StartScanning" set=" " answer="0" />
+  <Slide Id="StopScanning" set=" " answer="300" />
+</ScanPlanSetup>

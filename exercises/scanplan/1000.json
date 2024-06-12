@@ -1,0 +1,335 @@
+{
+  "partInfo": {
+    "material": "Steel",
+    "weldType": "V",
+    "width": 300,
+    "length": 200,
+    "height": 28,
+    "topCap": 15,
+    "bottomCap": 5
+  },
+  "categories": [
+    {
+      "label": "Probe Info",
+      "fields": [
+        {
+          "label": "Probe Config.",
+          "options": [
+            "A10 10L16",
+            "A10 10L32",
+            "A12 2.25L64",
+            "A14 5L60",
+            "A32 5L64"
+          ],
+          "value": "A10 10L16",
+          "answer": "A14 5L60",
+          "ref": "probeConfig"
+        },
+        {
+          "label": "Wedge Config.",
+          "options": [
+            "SA10-N55S-SA 10L16",
+            "SA10-N55S-SA 10L32",
+            "SA12-N55S 2.25L64",
+            "SA14-N55S 5L60",
+            "SA32-N55S 2.25L64",
+            "SA32-N55S 5L64"
+          ],
+          "value": "SA10-N55S-SA 10L16",
+          "answer": "SA14-N55S 5L60",
+          "ref": "wedgeConfig"
+        }
+      ]
+    },
+    {
+      "label": "Hardware & position",
+      "fields": [
+        {
+          "label": "Number of probes",
+          "min": 1,
+          "max": 2,
+          "value": 1,
+          "answer": 1,
+          "ref": "numProbes"
+        },
+        {
+          "label": "Probe",
+          "options": [
+            "1",
+            "2"
+          ],
+          "value": "1",
+          "answer": {
+            "min": 1,
+            "max": 2
+          },
+          "ref": "probe"
+        },
+        {
+          "label": "Skew (°)",
+          "options": [
+            "0",
+            "90",
+            "180",
+            "270"
+          ],
+          "values": [ "90", "270" ],
+          "answer": [ "90", "270" ],
+          "ref": "skew",
+          "level": "probe"
+        },
+        {
+          "label": "Scan offset (mm)",
+          "min": 0,
+          "max": 9000,
+          "value": 0,
+          "ref": "scanOffset",
+          "level": "probe"
+        },
+        {
+          "label": "Index offset (mm)",
+          "min": 0,
+          "max": 100,
+          "value": 15,
+          "step": 0.5,
+          "ref": "indexOffset",
+          "level": "probe"
+        },
+        {
+          "label": "Number of scans",
+          "min": 1,
+          "max": 2,
+          "value": 1,
+          "step": 1,
+          "ref": "numScans"
+        }
+      ]
+    },
+    {
+      "label": "Scan",
+      "fields": [
+        {
+          "label": "Scan",
+          "options": [
+            "1",
+            "2"
+          ],
+          "value": "1",
+          "ref": "scan",
+          "level": "probe"
+        },
+        {
+          "label": "Wave type",
+          "options": [
+            "Shear",
+            "Longitudinal"
+          ],
+          "value": "Shear",
+          "ref": "waveType",
+          "level": "scan"
+        },
+        {
+          "label": "Type of Scan",
+          "options": [
+            "L-Scan",
+            "S-Scan"
+          ],
+          "value": "S-Scan",
+          "ref": "typeScan",
+          "level": "scan"
+        },
+        {
+          "label": "Pulser",
+          "min": 1,
+          "max": 32,
+          "value": 1,
+          "ref": "pulser",
+          "level": "scan"
+        },
+        {
+          "label": "First element",
+          "min": 1,
+          "max": 32,
+          "value": 12,
+          "ref": "firstElement",
+          "level": "scan"
+        },
+        {
+          "label": "Last element",
+          "min": 1,
+          "max": 32,
+          "value": 12,
+          "ref": "lScanLastElement",
+          "level": "scan"
+        },
+        {
+          "label": "Number of elements",
+          "min": 1,
+          "max": 32,
+          "value": 16,
+          "ref": "numElements",
+          "level": "scan"
+        },
+        {
+          "label": "Start Angle (°)",
+          "min": -90,
+          "max": 90,
+          "ref": "startAngle",
+          "value": 35,
+          "level": "scan",
+          "answer": [ 30, 40, 50, 60 ]
+        },
+        {
+          "label": "Stop Angle (°)",
+          "min": -90,
+          "max": 90,
+          "ref": "stopAngle",
+          "value": 70,
+          "level": "scan"
+        },
+        {
+          "label": "Angular resolution",
+          "min": 0.1,
+          "max": 5,
+          "value": 1,
+          "step": 0.1,
+          "ref": "angularResolution",
+          "level": "scan"
+        },
+        {
+          "label": "Step",
+          "min": 1,
+          "max": 30,
+          "ref": "lScanStep",
+          "value": 2,
+          "level": "scan"
+        },
+        {
+          "label": "Angle",
+          "min": -90,
+          "max": 90,
+          "ref": "lScanAngle",
+          "value": 70,
+          "level": "scan"
+        },
+        {
+          "label": "Focus depth (mm)",
+          "min": 0,
+          "max": 1000,
+          "value": 25,
+          "ref": "focusDepth",
+          "level": "scan"
+        },
+        {
+          "label": "Start UT range (mm)",
+          "min": 0,
+          "max": 1000,
+          "value": 10,
+          "step": 1,
+          "ref": "startUtRange",
+          "level": "scan"
+        },
+        {
+          "label": "Range UT range (mm)",
+          "min": 1,
+          "max": 1000,
+          "value": 40,
+          "step": 1,
+          "ref": "rangeUtRange",
+          "level": "scan"
+        }
+      ]
+    },
+    {
+      "label": "UT settings",
+      "fields": [
+        {
+          "label": "Gain (dB)",
+          "min": 0,
+          "max": 100,
+          "value": 10,
+          "step": 0.5,
+          "ref": "gain"
+        },
+        {
+          "label": "Energy (V)",
+          "min": 50,
+          "max": 200,
+          "value": 100,
+          "step": 50,
+          "ref": "energy"
+        },
+        {
+          "label": "PRF (scan/s)",
+          "min": 1,
+          "max": 1000,
+          "value": 100,
+          "step": 1,
+          "ref": "prf"
+        },
+        {
+          "label": "Filter (MHz)",
+          "min": 0.5,
+          "max": 20,
+          "value": 5,
+          "step": 0.25,
+          "ref": "filter"
+        },
+        {
+          "label": "Video filter",
+          "options": [
+            "On",
+            "Off"
+          ],
+          "value": "Off",
+          "ref": "videoFilter"
+        },
+        {
+          "label": "Reject (%)",
+          "min": 0,
+          "max": 100,
+          "value": 0,
+          "step": 1,
+          "ref": "reject"
+        },
+        {
+          "label": "Point quantity",
+          "min": 100,
+          "max": 9000,
+          "value": 0,
+          "step": 100,
+          "ref": "pointQuantity"
+        }
+      ]
+    },
+    {
+      "label": "Scanner settings",
+      "fields": [
+        {
+          "label": "Scan resolution (mm)",
+          "min": 0.5,
+          "max": 10,
+          "value": 1,
+          "step": 0.5,
+          "ref": "scanResolution"
+        },
+        {
+          "label": "Start (mm)",
+          "min": 0,
+          "max": 10000,
+          "value": 1,
+          "step": 1,
+          "ref": "start"
+        },
+        {
+          "label": "Stop (mm)",
+          "min": 1,
+          "max": 10000,
+          "value": 300,
+          "step": 1,
+          "ref": "stop"
+        }
+      ]
+    }
+  ]
+}

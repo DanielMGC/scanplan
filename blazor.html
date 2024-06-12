@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Do Your Scan Plan</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <script src="js/jquery-3.6.3.min.js"></script>
+    <link type="text/css" rel="stylesheet" href="css/main.css">
+    <link href="js/jquery-ui/jquery-ui.css" rel="stylesheet">
+
+</head>
+<body>
+
+    <div id="container">
+        <iframe id="exercise" scrolling="no" height="400" width="100%" src="https://localhost:44393/DataAnalysisAngledPA/104100106"></iframe>
+        <br />
+        <button onclick="requestFullScreen()" class="boutonFullScreen"><i class="fa fa-search-plus"></i>Full Screen</button> <span class="texteFullScreen">GO INTO FULL SCREEN MODE TO EDIT</span>
+        <script>
+
+            function requestFullScreen() {
+                var elem = document.getElementById("exercise");
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen();
+                }
+            }
+
+            window.addEventListener('message', function (event) {
+                // extract the data from the message event
+                const { data } = event;
+
+                var result = JSON.parse(data);
+
+                saveResults(result)
+            });
+
+            function saveResults(result) {
+                console.log(result);
+
+                $.ajax({
+                    url: 'https://dev.phasexelearning.com/reception-reponses-blazor/',
+                    type: 'POST',
+                    data: result,
+                    dataType: 'json',
+                    success: function (msg) {
+                        window.location = "";
+                    },
+                    error: function (jqXHR, textStatus) {
+                        let responseText = jQuery.parseJSON(jqXHR.responseText);
+                        console.log(responseText);
+                    }
+                });
+            }
+
+        </script>
+    </div>
+</body>
+</html>

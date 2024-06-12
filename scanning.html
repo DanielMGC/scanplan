@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Scanning</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		
+		<script src="js/jquery-3.6.3.min.js"></script>
+		<style>
+			
+			a {
+				color: red;
+			}
+			
+			#container{
+				width: 100%;
+				height: 100vh;
+				position: relative;
+				display: grid;
+				grid-template-rows: 100px auto;
+			}
+			
+			.box{
+				width: 100%;
+				height: 100%;      
+			}
+			
+			#div3d {
+				width: 100%;
+				height: 50%;
+			}
+			#div2d {
+				width: 100%;
+				height: 50%;
+			}
+			
+			#divOverlay {
+			}
+			
+			#canvasOverlay {
+			}
+			.label {
+				color: #000000;
+				font-family: sans-serif;
+				padding: 2px;
+			}
+			
+			#divInfo{
+				padding-top: 20px;
+				padding-left: 50px;
+				font-family: Tahoma, sans-serif;
+			}
+			
+			.red {
+				color: #ff0000;
+			}
+			
+			.green {
+				color: #36ad5a;
+			}
+		</style>
+	</head>
+	<body>
+
+		<div id="container">
+			<div id="divInfo">
+				<label>Max speed: </label><label class="red">20mm/s</label>
+				<br/>
+				<label>Your speed: </label><label id="lblSpeed"></label>
+			</div>
+			<div>
+				<div id="divOverlay" class="box">
+					<canvas id="canvasOverlay"></canvas>
+				</div>
+			</div>
+			
+		</div>
+
+
+		<script type="module">
+		
+			const partWidthRel = 300;
+			const partHeightRel = 75;
+			const marginWidth = 20;
+			const marginTop = 0;
+			const minBottom = 300;
+			const lineDistPercent = 10;
+			const scannerHeightPercent = 70;
+			const scannerMarginPercent = 1;
+			
+			let canvasHeight, canvasWidth;
+			let partWidth, partHeight, partX, partY, scannerWidth, scannerHeight, scannerX, scannerY;
+			let scanWidth, scanHeight, scanX, scanY
+			
+			let scannerMargin = 0;
+			
+			let startX, mouseX;
+			let startY, mouseY;
+			
+			let moving = false;
+			let scannerDiffX = 0;
+			
+			let scannerDiffXPercent = 0;
+			
+			var scannerImg;
+			var imgLoaded = false;
+			
+			var scanImg;
+			var scanLoaded = false;
+			
+			let speed = 0;
+			
+			var distanceMoved = 0;
+			
+			var moveInterval = setInterval(checkInterval, 100);
+			
+			var scanIntervals = [];
+			
+			var lastScannerStart = 0;
+			var lastScannerStop = 0;
+			
+			window.addEventListener( 'resize', onWindowResize );
+
+			onWindowResize();
+			
+			$("#canvasOverlay").mousedown(function (e) {
+				handleMouseDown(e);
+			});
+			$("#canvasOverlay").mousemove(function (e) {
+				handleMouseMove(e);
+			});
+			$("#canvasOverlay").mouseup(function (e) {
+				handleMouseUp(e);
+			});
+			$("#canvasOverlay").mouseout(function (e) {
+				handleMouseOut(e);
+			});
+			
+			function checkInterval() {
+				speed = (partWidthRel * (distanceMoved * 10)) / partWidth;
+				distanceMoved = 0;
+				$("#lblSpeed").html(speed.toFixed(2) + "mm/s");
+				$("#lblSpeed").removeClass("green");
+				$("#lblSpeed").removeClass("red");
+				
+				var newScanStart = scannerDiffX - scannerMargin;
+				var newScanStop = scannerDiffX + scannerWidth + scannerMargin;
+
+				var pNewStart = (newScanStart * 100) / partWidth;
+				var pNewStop = (newScanStop * 100) / partWidth;
+
+				var iStart = pNewStart;
+				if(lastScannerStart < iStart)
+					iStart = lastScannerStart;
+					
+				var iStop = pNewStop;
+				if(lastScannerStop > iStop)
+					iStop = lastScannerStop;
+					
+				var changed = false;
+				if(lastScannerStart != pNewStart || lastScannerStop != pNewStop)
+					changed = true;
+				lastScannerStart = pNewStart;
+				lastScannerStop = pNewStop;
+				
+				if(speed > 20) 
+					$("#lblSpeed").addClass("red");
+				else if(speed > 0) {
+					$("#lblSpeed").addClass("green");
+					if(changed)
+						addInterval(iStart, iStop);
+				}
+			}
+			
+			function addInterval(start, stop){
+				if(scanIntervals.length == 0){
+					scanIntervals.push({start: start, stop: stop});
+				} else {
+					var added = false;
+					var index = 0;
+					while(index < scanIntervals.length && scanIntervals[index].start < start) {
+						index++;
+					}
+					scanIntervals.splice(index, 0, {start: start, stop: stop});
+					
+					index = 0;
+					while(index < scanIntervals.length - 1) {
+						if(scanIntervals[index+1].start <= scanIntervals[index].stop) {
+							if(scanIntervals[index+1].stop > scanIntervals[index].stop)
+								scanIntervals[index].stop = scanIntervals[index+1].stop;
+							scanIntervals.splice(index+1,1);
+						} else {
+							index++;
+						}
+					}
+				}
+			}
+		
+			function onWindowResize() {
+
+				var htmlCanvas = document.getElementById('canvasOverlay');
+				htmlCanvas.width = window.innerWidth;
+				htmlCanvas.height = window.innerHeight - 100;
+				var canvasAreaWidth = window.innerWidth;
+				var canvasAreaHeight = window.innerHeight - 100;
+				
+				$("#divOverlay").width(canvasAreaWidth);
+				$("#divOverlay").height(canvasAreaHeight);
+				
+				$("#canvasOverlay").width(canvasAreaWidth);
+				$("#canvasOverlay").height(canvasAreaHeight);
+				
+				canvasWidth = htmlCanvas.width;
+				canvasHeight = htmlCanvas.height;
+				
+				var maxWidth = canvasAreaWidth - (2*marginWidth);
+				var maxHeight = canvasAreaHeight - marginTop - minBottom;
+				
+				partWidth = maxWidth;
+				partHeight = (partHeightRel * partWidth) / partWidthRel;
+
+				if(partHeight > maxHeight) {
+					partHeight = maxHeight;
+					partWidth = (partWidthRel * partHeight) / partHeightRel;
+				}
+				
+				partX = ((canvasAreaWidth - partWidth)/2.0);
+				partY = marginTop;
+				
+				if(imgLoaded){
+					scannerHeight = partHeight * (scannerHeightPercent / 100.0);
+					scannerWidth = (scannerHeight * scannerImg.width) / scannerImg.height;
+				}
+				
+				scanHeight = canvasHeight - partHeight - 50;
+				scanWidth = partWidth;
+				scanX = partX;
+				scanY = partY + partHeight + 20;
+				
+				scannerMargin = partWidth * (scannerMarginPercent / 100.0);
+				
+				scannerDiffX = (partWidth * scannerDiffXPercent) / 100.0; 
+				
+				$("#divInfo").css("padding-left",partX + "px");
+
+				draw();
+			}
+			
+			function handleMouseDown(e) {
+				e.preventDefault();
+				startX = parseInt(e.clientX);
+				startY = parseInt(e.clientY - 100);
+				moving = false;
+				if(startX >= scannerX && startX <= (scannerX + scannerWidth) && startY >= scannerY && startY <= (scannerY + scannerHeight)) {
+					moving = true;
+				} 
+			}
+			
+			
+			function handleMouseMove(e) {
+
+				if (!moving) {
+					return;
+				}
+				e.preventDefault();
+				mouseX = parseInt(e.clientX);
+
+				// Put your mousemove stuff here
+				var dx = mouseX - startX;
+				startX = mouseX;
+
+				var newDiff = scannerDiffX + dx;
+
+				if(newDiff < scannerMargin)
+					newDiff = scannerMargin;
+					
+				if(newDiff > (partWidth - scannerWidth - (scannerMargin)))
+					newDiff = (partWidth - scannerWidth - (scannerMargin));
+
+				distanceMoved += Math.abs(scannerDiffX - newDiff);
+				scannerDiffX = newDiff;
+				
+				scannerDiffXPercent = (scannerDiffX * 100)/partWidth; 
+				
+				draw();
+			}
+			
+			function handleMouseUp(e) {
+				moving = false;
+			}
+			
+			function handleMouseOut(e) {
+				moving = false;
+			}
+			
+			function draw() {
+				
+				var c = document.getElementById("canvasOverlay");
+				var ctx = c.getContext("2d");
+				
+				ctx.clearRect(0, 0, c.width, c.height);
+
+				// Red rectangle
+				ctx.beginPath();
+				ctx.lineWidth = "6";
+				ctx.fillStyle = "#cccccc";
+				ctx.rect(partX, partY, partWidth, partHeight);
+				ctx.fill();
+				
+				
+				if (ctx.setLineDash !== undefined) {
+					ctx.setLineDash([10, 5]);
+				}
+				if (ctx.mozDash !== undefined) {
+					ctx.mozDash = [10, 5];
+				}
+				ctx.beginPath();
+				ctx.lineWidth = "1";
+				ctx.strokeStyle = "#888888";
+				ctx.moveTo(partX, partY + (partHeight/2));
+				ctx.lineTo(partX + partWidth, partY + (partHeight/2));
+				
+				var diffLine = partHeight * (lineDistPercent / 100.0);
+				
+				ctx.moveTo(partX, partY + (partHeight/2) - diffLine);
+				ctx.lineTo(partX + partWidth, partY + (partHeight/2) - diffLine);
+				
+				ctx.moveTo(partX, partY + (partHeight/2) + diffLine);
+				ctx.lineTo(partX + partWidth, partY + (partHeight/2) + diffLine);
+				
+				ctx.stroke();
+				
+				if (!imgLoaded){
+					scannerDiffX = scannerMargin;
+					scannerDiffXPercent = (scannerDiffX * 100)/partWidth; 
+					scannerImg = new Image();
+					scannerImg.src = './images/image7.png';
+					scannerImg.onload = function() {
+					imgLoaded = true;
+						scannerHeight = partHeight * (scannerHeightPercent / 100.0);
+						scannerWidth = (scannerHeight * scannerImg.width) / scannerImg.height;
+						scannerX = partX + scannerDiffX;
+						scannerY = partY + (partHeight /2) - (scannerHeight /2) + (scannerHeight * 0.05);
+						ctx.drawImage(scannerImg, scannerX, scannerY,scannerWidth, scannerHeight);
+					};
+				} else {
+					scannerX = partX + scannerDiffX;
+					scannerY = partY + (partHeight /2) - (scannerHeight /2) + (scannerHeight * 0.05);
+					ctx.drawImage(scannerImg, scannerX, scannerY,scannerWidth, scannerHeight);
+				}
+				
+				if (!scanLoaded){
+					
+					scanImg = new Image();
+					scanImg.src = './images/image8.png';
+					scanImg.onload = function() {
+					scanLoaded = true;
+						scanHeight = canvasHeight - partHeight - 80;
+						scanWidth = partWidth;
+						scanX = partX;
+						scanY = partY + partHeight + 40;
+						drawScan(ctx);
+					};
+				} else {
+					drawScan(ctx);
+				}
+			}
+
+			function drawScan(ctx) {
+				ctx.fillStyle = "#333333";
+				ctx.rect(scanX, scanY, scanWidth, scanHeight);
+				ctx.fill();
+				
+				for(var i=0; i<scanIntervals.length; i++) {
+					var pDiff = scanIntervals[i].stop - scanIntervals[i].start;
+					var intWidth = (scanWidth * pDiff) / 100.0;
+					var intPosX = scanX + (scanWidth * scanIntervals[i].start) / 100.0;
+					var intPosClipX = (scanImg.width * scanIntervals[i].start) / 100.0;
+					var intClipWidth = (scanImg.width * pDiff) / 100.0;
+					ctx.drawImage(scanImg, intPosClipX, 0, intClipWidth, scanHeight, intPosX, scanY, intWidth, scanHeight );
+				}
+			}
+
+		</script>
+
+	</body>
+</html>

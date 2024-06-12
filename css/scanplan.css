@@ -1,0 +1,136 @@
+button {
+    cursor: pointer;
+}
+
+#container {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+    background-color: #ffffff;
+}
+
+    #container.fullscreen {
+        width: 100%;
+        height: 100vh;
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        margin: 0px !important;
+        padding: 0px !important;
+        background-color: #ffffff;
+    }
+
+.box {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#div3d {
+    width: calc(100% - 400px);
+    height: 65%;
+}
+
+#divOverlay2dBottom button,
+#divOverlay3d button {
+    text-align: center;
+    border-radius: 0px;
+    border-width: 1px;
+    width: 90px;
+    padding: 5px 0px;
+}
+
+#divOverlay2dBottom button {
+    width: 184px;
+}
+
+#div2d {
+    width: calc(100% - 400px);
+    height: 35%;
+}
+
+#divOverlay {
+    z-index: 9;
+    pointer-events: none;
+}
+
+#canvasOverlay {
+    position: absolute;
+}
+
+.label {
+    color: #000000;
+    font-family: sans-serif;
+    padding: 2px;
+}
+
+#divOverlay3d {
+    position: absolute;
+    height: 100px;
+    width: 400px;
+    top: 0px;
+    left: 0px;
+    padding: 5px;
+}
+
+#divOverlay2d {
+    position: absolute;
+    height: 100px;
+    width: 300px;
+    top: 0px;
+    left: 0px;
+    padding: 5px;
+    color: #444;
+    font-family: Monospace;
+    font-size: 13px;
+    line-height: 20px;
+}
+
+    #divOverlay2d b {
+        font-weight: bold;
+    }
+
+#divOverlay2dBottom {
+    position: absolute;
+    height: 20px;
+    width: 100%;
+    top: 0px;
+    left: 0px;
+    padding: 5px;
+}
+
+    #divOverlay2dBottom label {
+        padding-left: 5px;
+        color: #ff0000;
+    }
+
+#container.fullscreen #divOverlay2dBottom label {
+    display: none;
+}
+
+.ui-active {
+    border: 1px solid #003eff !important;
+    background: #007fff !important;
+    font-weight: normal !important;
+    color: #ffffff !important;
+}
+
+    .ui-active .ui-icon {
+        background-image: url('../js/jquery-ui/images/ui-icons_ffffff_256x240.png') !important;
+    }
+
+.dg.ac.hidden {
+    display: none !important;
+}
+
+.chrono_fullscreen {
+    position: absolute !important;
+    top: 5px !important;
+    right: 420px !important;
+    z-index: 200;
+}
+.display-none{
+    display: none;
+}

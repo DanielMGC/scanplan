@@ -1,0 +1,247 @@
+{
+  "part": {
+    "material": "Steel",
+    "thickness": 25,
+    "weldType": "V",
+    "topCap": 15,
+    "bottomCap": 5
+  },
+  "probeInfo": {
+    "probe": { "answer": "A10 10L32" },
+    "wedge": { "answer": "SA12-N55S 2.25L64" }
+  },
+  "hardware": {
+    "numProbes": {
+      "set": 1,
+      "answer": 2
+    },
+    "numScans": {
+      "set": 1,
+      "answer": 2
+    },
+    "probes": [
+      {
+        "skew": {
+          "set": 90,
+          "answer": 90
+        },
+        "scanOffset": {
+          "set": 0,
+          "answer": 0
+        },
+        "indexOffset": {
+          "set": 0,
+          "answer": -15
+        },
+        "scans": [
+          {
+            "waveType": { "answer": "Shear" },
+            "typeScan": { "answer": "S-Scan" },
+            "firstElement": {
+              "set": 1,
+              "answer": 12
+            },
+            "numElements": {
+              "set": 8,
+              "answer": 16
+            },
+            "startAngle": {
+              "set": 45,
+              "answer": 35
+            },
+            "stopAngle": {
+              "set": 55,
+              "answer": 70
+            },
+            "angularResolution": {
+              "set": 1,
+              "answer": 1
+            },
+            "focusDepth": {
+              "answer": 50
+            },
+            "startUtRange": {
+              "set": 0,
+              "answer": 10
+            },
+            "rangeUtRange": {
+              "set": 0,
+              "answer": 60
+            }
+          },
+          {
+            "waveType": { "answer": "Shear" },
+            "typeScan": { "answer": "S-Scan" },
+            "firstElement": {
+              "set": 1,
+              "answer": 12
+            },
+            "numElements": {
+              "set": 8,
+              "answer": 16
+            },
+            "startAngle": {
+              "set": 45,
+              "answer": 35
+            },
+            "stopAngle": {
+              "set": 55,
+              "answer": 70
+            },
+            "angularResolution": {
+              "set": 1,
+              "answer": 1
+            },
+            "focusDepth": {
+              "answer": 50
+            },
+            "startUtRange": {
+              "set": 0,
+              "answer": 10
+            },
+            "rangeUtRange": {
+              "set": 0,
+              "answer": 60
+            }
+          }
+        ]
+      },
+      {
+        "skew": {
+          "set": 270,
+          "answer": 90
+        },
+        "scanOffset": {
+          "set": 0,
+          "answer": 0
+        },
+        "indexOffset": {
+          "set": 0,
+          "answer": 15
+        },
+        "scans": [
+          {
+            "waveType": { "answer": "Shear" },
+            "typeScan": { "answer": "S-Scan" },
+            "firstElement": {
+              "set": 1,
+              "answer": 12
+            },
+            "numElements": {
+              "set": 8,
+              "answer": 16
+            },
+            "startAngle": {
+              "set": 45,
+              "answer": 35
+            },
+            "stopAngle": {
+              "set": 55,
+              "answer": 70
+            },
+            "angularResolution": {
+              "set": 1,
+              "answer": 1
+            },
+            "focusDepth": {
+              "answer": 50
+            },
+            "startUtRange": {
+              "set": 0,
+              "answer": 10
+            },
+            "rangeUtRange": {
+              "set": 0,
+              "answer": 60
+            }
+          },
+          {
+            "waveType": { "answer": "Shear" },
+            "typeScan": { "answer": "S-Scan" },
+            "firstElement": {
+              "set": 1,
+              "answer": 12
+            },
+            "numElements": {
+              "set": 8,
+              "answer": 16
+            },
+            "startAngle": {
+              "set": 45,
+              "answer": 35
+            },
+            "stopAngle": {
+              "set": 55,
+              "answer": 70
+            },
+            "angularResolution": {
+              "set": 1,
+              "answer": 1
+            },
+            "focusDepth": {
+              "answer": 50
+            },
+            "startUtRange": {
+              "set": 0,
+              "answer": 10
+            },
+            "rangeUtRange": {
+              "set": 0,
+              "answer": 60
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "scannerSettings": {
+    "scanReso"
+  }
+}
+
+
+<ScanPlanSetup test="abc">    
+
+  <Slide Id="Gain" set="0" answer="20" />
+  <Slide Id="FilterSonde1" set=" " answer="5" />
+  <Slide Id="FilterSonde2" set=" " answer="5" />
+  
+
+  <Slide Id="WaveType1_2" set=" " answer="Shear" />
+  <Slide Id="TypeScan1_2" set=" " answer="S-Scan" />
+  <Slide Id="FirstElement1_2" set="1" answer="12" />
+  <Slide Id="NumberElement1_2" set="8" answer="16" />
+  <Slide Id="StartAngle1_2" set="45" answer="35" />
+  <Slide Id="StopAngle1_2" set="55" answer="70" />
+  <Slide Id="AngularReso1_2" set="1" answer="1" />
+  <Slide Id="FocusDepth1_2" set="1000" answer="50" />
+  <Slide Id="StartRange1_2" set="0" answer="10" />
+  <Slide Id="RangeRange1_2" set="0" answer="60" />
+  
+  <Slide Id="WaveType2_1" set=" " answer="Shear" />
+  <Slide Id="TypeScan2_1" set=" " answer="S-Scan" />
+  <Slide Id="FirstElement2_1" set="1" answer="12" />
+  <Slide Id="NumberElement2_1" set="8" answer="16" />
+  <Slide Id="StartAngle2_1" set="45" answer="35" />
+  <Slide Id="StopAngle2_1" set="55" answer="70" />
+  <Slide Id="AngularReso2_1" set="1" answer="1" />
+  <Slide Id="FocusDepth2_1" set="1000" answer="50" />
+  <Slide Id="StartRange2_1" set="0" answer="10" />
+  <Slide Id="RangeRange2_1" set="0" answer="60" />
+  
+  <Slide Id="WaveType2_2" set=" " answer="Shear" />
+  <Slide Id="TypeScan2_2" set=" " answer="S-Scan" />
+  <Slide Id="FirstElement2_2" set="1" answer="12" />
+  <Slide Id="NumberElement2_2" set="8" answer="16" />
+  <Slide Id="StartAngle2_2" set="45" answer="35" />
+  <Slide Id="StopAngle2_2" set="55" answer="70" />
+  <Slide Id="AngularReso2_2" set="1" answer="1" />
+  <Slide Id="FocusDepth2_2" answer="50" />
+  <Slide Id="StartRange2_2" set="0" answer="10" />
+  <Slide Id="RangeRange2_2" set="0" answer="60" />
+  
+ 
+  <Slide Id="ScanningResolution" set=" " answer="1" />
+  <Slide Id="StartScanning" set=" " answer="0" />
+  <Slide Id="StopScanning" set=" " answer="300" />
+</ScanPlanSetup>

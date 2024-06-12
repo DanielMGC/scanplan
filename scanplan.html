@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>Do Your Scan Plan</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<script src="js/jquery-3.6.3.min.js"></script>
+	<link type="text/css" rel="stylesheet" href="css/main.css">
+	<link type="text/css" rel="stylesheet" href="css/scanplan.css">
+	<link href="js/jquery-ui/jquery-ui.css" rel="stylesheet">
+
+</head>
+	<body>
+
+		<div id="container">
+			<div id="divThree" class="box">
+				<div id="div2d"></div>
+				<div id="div3d"></div>
+			</div>
+			<div id="divOverlay2d">
+				<b>Part & weld</b><br />
+				Material: <label id="lblMaterial"></label><br />
+				Thickness: <label id="lblThickness"></label>mm<br />
+				Length: <label id="lblLength"></label>mm<br />
+				Weld type: <label id="lblWeldType"></label><br />
+				Width top cap: <label id="lblTopCap"></label>mm<br />
+				Width bottom cap: <label id="lblBottomCap"></label>mm
+			</div>
+			<div id="divOverlay2dBottom">
+				<button id="btnFullScreen" onclick="fullScreen();"><i class="fa fa-search-plus"></i> Full Screen</button>
+				<button id="btnSubmit" onclick="submit()"><i class="fa fa-check"></i> Submit</button>
+				<label>TO START THE EXERCISE CLICK ON FULL SCREEN</label>
+			</div>
+			<div id="divOverlay3d">
+				<button id="btnTop" onclick="moveCamera('top');"><i class="fa fa-arrow-down"></i> Top</button>
+				<button id="btnSide" onclick="moveCamera('side');"><i class="fa fa-arrow-right"></i> Side</button>
+				<button id="btnFront" onclick="moveCamera('front');"><i class="fa fa-arrow-up"></i> Front</button>
+				<button id="btnFree" onclick="moveCamera('free');"><i class="fa fa-eye"></i> Free</button>
+			</div>
+		</div>
+
+
+		<script type="text/javascript" src="js/dat.gui/build/dat.gui.js"></script>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./js/three/three.module.js",
+					"three/addons/": "./js/three/jsm/",
+					"dat.gui": "./js/dat.gui/build/dat.gui.js"
+				}
+			}
+		</script>
+
+
+		<script type="module">
+			import * as THREE from "three";
+			import {
+				OrbitControls
+			} from "three/addons/controls/OrbitControls.js";
+			let s2di = 0;
+			let s3di = 1;
+			var probesBoxObjs = [
+				[null, null],
+				[null, null]
+			];
+			let saveTimeout = null;
+			let isFullScreen = false;
+			let selectedCamera = "top";
+			let containers = [null, null];
+			let cameras = [null, null];
+			let renderers = [null, null];
+			let scenes = [null, null];
+			var controls3d;
+			let config, partConfig, probeWedgeConfig;
+			let relWidth = 10.0
+			let params = {};
+			let probes = [
+				{
+					groups: [new THREE.Group(), new THREE.Group()],
+					currentScan: 0,
+					scans: [{}, {}]
+				},
+				{
+					groups: [new THREE.Group(), new THREE.Group()],
+					currentScan: 0,
+					scans: [{}, {}]
+				}
+			];
+
+			let partInfo = {
+				width: 300,
+				length: 200,
+				height: 28,
+				topCap: 15,
+				bottomCap: 5
+			};
+
+			var partSceneInfo = {};
+
+			let probeInfo = {
+				angle: toRadians(36.1),
+				angle2: 0,
+				L: 72.99,
+				H: 44.7,
+				W: 46,
+				X: 70.26,
+				Z: 17.23,
+				pitch: 1,
+				sH: 0,
+				sW: 0
+			};
+
+			let probeSceneInfo = {};
+			var gui;
+			var probeHtmlElement, scanHtmlElement;
+			var guiFields = [];
+			init();
+			
+			let draggedProbe = -1;
+			let dragScene = -1;
+			let mousePos = null;
+
+			let answers = "";// ' . str_replace('"', '\"',$reponsesEnregistreesBD) . '";
+
+			const fullScreenElement = document.querySelector("#fullscreen-div");
+
+			let lScanElements = [];
+			let sScanElements = [];
+
+			window.addEventListener("fullscreenchange", onFullScreen);
+
+			function getMousePos(event) {
+
+				let divHeight = $("#divThree").height();
+				let divWidth = $("#divThree").width();
+				let offset = $("#divThree").offset();
+
+				let target = document.getElementById("divThree");
+
+				let rect = target.getBoundingClientRect();
+
+				//let clickX = event.clientX - offset.left;
+				//let clickY = event.clientY - offset.top - $(window).scrollTop();
+
+				let clickX = event.clientX - rect.left;
+				let clickY = event.clientY - rect.top;
+
+				let pos = new THREE.Vector2(0, 0);
+				//const width = window.innerWidth - 400;
+				//const height2d = (window.innerHeight * 0.35);
+				//const height3d = (window.innerHeight * 0.65);
+				const width = getDivWidth();//divWidth - 400;
+				const height2d = (divHeight * 0.35);
+				const height3d = (divHeight * 0.65);
+
+				let scene = clickY > height2d ? s3di : s2di;
+				let sceneHeight = scene == s2di ? height2d : height3d;
+				let offsetY = scene == s2di ? 0 : height2d;
+
+				pos.x = (clickX / width) * (cameras[scene].right * 2) - cameras[scene].right;
+				pos.y = -((clickY - offsetY) / sceneHeight) * (cameras[scene].top * 2) + cameras[scene].top;
+
+				return {
+					pos: pos,
+					scene: scene
+				};
+			}
+			window.addEventListener("mousedown", event => {
+				let click = getMousePos(event);
+				let clickedProbe = -1;
+				let closestCoord = 0;
+				let coordCompare = 0;
+				if (click.scene == s3di && selectedCamera == "free") {
+					draggedProbe = -1;
+					return;
+				}
+				for (var i = 0; i < params.numProbes; i++) {
+					var bbox = new THREE.Box3().setFromObject(probesBoxObjs[i][click.scene]);
+					let minX, maxX, minY, maxY;
+					if (click.scene == s3di && selectedCamera == "top") {
+						minX = bbox.min.x;
+						maxX = bbox.max.x;
+						minY = -bbox.max.z;
+						maxY = -bbox.min.z;
+						coordCompare = bbox.min.y;
+					} else if (click.scene == s3di && selectedCamera == "front") {
+						minX = -bbox.max.z;
+						maxX = -bbox.min.z;
+						minY = bbox.min.y;
+						maxY = bbox.max.y;
+						coordCompare = -bbox.max.x;
+					} else {
+						minX = bbox.min.x;
+						maxX = bbox.max.x;
+						minY = bbox.min.y;
+						maxY = bbox.max.y;
+						coordCompare = -bbox.min.z;
+					}
+					if (click.pos.x >= minX && click.pos.x <= maxX && click.pos.y >= minY && click.pos.y <= maxY) {
+						if (clickedProbe == -1) {
+							clickedProbe = i;
+							closestCoord = coordCompare;
+						} else {
+							if (coordCompare < closestCoord) {
+								clickedProbe = i;
+								closestCoord = coordCompare;
+							}
+						}
+					}
+				}
+				if (clickedProbe != -1) {
+					mousePos = click;
+					draggedProbe = clickedProbe;
+					if (clickedProbe != (params.probe - 1)) {
+						params.probe = clickedProbe + 1;
+						changeProbe();
+					}
+				}
+			});
+			window.addEventListener("mouseup", event => {
+				draggedProbe = -1;
+			});
+			window.addEventListener("mousemove", event => {
+				if (draggedProbe > -1) {
+					let pos = getMousePos(event);
+					let diffX = mousePos.pos.x - pos.pos.x;
+					let diffOffset = (diffX * partInfo.width) / partSceneInfo.width;
+					if (mousePos.scene == s3di && selectedCamera == "front") {
+						params.scanOffset -= diffOffset;
+					} else {
+						params.indexOffset -= diffOffset;
+					}
+					if (mousePos.scene == s3di && selectedCamera == "top") {
+						let diffY = mousePos.pos.y - pos.pos.y;
+						let diffOffsetY = (diffY * partInfo.length) / partSceneInfo.length;
+						params.scanOffset -= diffOffsetY;
+					}
+					if (params.indexOffset > (partInfo.width / 2)) params.indexOffset = (partInfo.width / 2);
+					if (params.indexOffset < -(partInfo.width / 2)) params.indexOffset = -(partInfo.width / 2);
+					if (params.scanOffset > partInfo.length) params.scanOffset = partInfo.length;
+					if (params.scanOffset < 0) params.scanOffset = 0;
+					gui.updateDisplay();
+					checkSave();
+					updateProbePos();
+					mousePos = pos;
+				}
+			});
+
+			function toSceneUnits(realValue) {
+				return (realValue * relWidth) / partInfo.width;
+			}
+
+			function toRadians(degrees) {
+				return degrees * (Math.PI / 180);
+			}
+
+			function toDegrees(radians) {
+				var pi = Math.PI;
+				return radians * (180 / pi);
+			}
+
+			function loadGui() {
+				gui = new dat.gui.GUI();
+
+				let folders = {};
+
+				for (var i = 0; i < config.categories.length; i++) {
+					let cat = config.categories[i]
+					folders[cat.label] = gui.addFolder(cat.label);
+					for (var j = 0; j < cat.fields.length; j++) {
+						let fieldDef = cat.fields[j];
+
+						params[fieldDef.ref] = fieldDef.hasOwnProperty("value") ? fieldDef.value : fieldDef.values[0];
+
+						let field;
+						if (fieldDef.hasOwnProperty("min")) {
+							let step = 1;
+							if (fieldDef.hasOwnProperty("step"))
+								step = fieldDef.step;
+
+							let min = fieldDef.min;
+							let max = fieldDef.max;
+
+							if (fieldDef.ref == "indexOffset") {
+								min = - partInfo.width / 2;
+								max = -min;
+								params[fieldDef.ref] = 0;
+							} else if (fieldDef.ref == "scanOffset") {
+								min = 0;
+								max = partInfo.length;
+								params[fieldDef.ref] = 0;
+							} else if (fieldDef.ref == "focusDepth" || fieldDef.ref == "rangeUtRange") {
+								min = 0;
+								max = partInfo.height * 2;
+								params[fieldDef.ref] = max;
+							} else if (fieldDef.ref == "startUtRange") {
+								min = 0;
+								max = partInfo.height * 2;
+								params[fieldDef.ref] = 0;
+							}
+							field = folders[cat.label].add(params, fieldDef.ref, min, max).step(step);
+						} else if (fieldDef.hasOwnProperty("options")) {
+							field = folders[cat.label].add(params, fieldDef.ref, fieldDef.options);
+						}
+						field.name(fieldDef.label);
+
+						if (fieldDef.hasOwnProperty("level")) {
+							if (fieldDef.level == "probe") {
+								for (var p = 0; p < probes.length; p++) {
+									probes[p][fieldDef.ref] = fieldDef.hasOwnProperty("value") ? params[fieldDef.ref] : fieldDef.values[p];
+								}
+							} else if (fieldDef.level == "scan") {
+								for (var p = 0; p < probes.length; p++) {
+									for (var s = 0; s < probes[p].scans.length; s++) {
+										probes[p].scans[s][fieldDef.ref] = params[fieldDef.ref];
+									}
+								}
+							}
+						}
+
+						//if (fieldDef.ref == "partWidth" || fieldDef.ref == "partLength" || fieldDef.ref == "partHeight") {
+						//	field.onChange(function () {
+						//		updatePart();
+						//	});
+						//} else if (fieldDef.ref == "probe") {
+						//	probeHtmlElement = field.domElement;
+						//	$($(probeHtmlElement).children("select")[0]).attr("disabled", true);
+						//	field.onChange(function () {
+						//		changeProbe();
+						//	});
+						//} else if (fieldDef.ref.startsWith("probe") || fieldDef.ref == "firstElement" || fieldDef.ref == "numElements" || fieldDef.ref == "partSpeed" || fieldDef.ref == "wedgeSpeed") {
+						if (fieldDef.ref == "probe") {
+							probeHtmlElement = field.domElement;
+							$($(probeHtmlElement).children("select")[0]).attr("disabled", true);
+							field.onChange(function () {
+								checkSave();
+								changeProbe();
+							});
+						} else if (fieldDef.ref == "firstElement" || fieldDef.ref == "numElements") {
+							field.onChange(function () {
+								//updateProbes();
+								checkSave();
+								updateSelectedElements();
+							});
+						}
+						else if (fieldDef.ref == "startAngle" || fieldDef.ref == "stopAngle" || fieldDef.ref == "angularResolution" || fieldDef.ref == "focusDepth" || fieldDef.ref == "startUtRange" || fieldDef.ref == "rangeUtRange") {
+							if (fieldDef.ref == "startAngle" || fieldDef.ref == "stopAngle" || fieldDef.ref == "angularResolution") {
+								let element = field.domElement;
+								sScanElements.push($(element).closest('li'));
+							}
+							field.onChange(function () {
+								checkSave();
+								updateCurrentScan();
+							});
+						}
+						else if (fieldDef.ref == "lScanLastElement") {
+                            let element = field.domElement;
+                            $(element).closest('li').addClass("display-none");
+                            lScanElements.push($(element).closest('li'));
+                            field.onChange(function () {
+								checkSave();
+                                updateSelectedElements();
+                            });
+						} else if (fieldDef.ref.indexOf("lScan") == 0) {
+							let element = field.domElement;
+                            $(element).closest('li').addClass("display-none");
+							lScanElements.push($(element).closest('li'));
+                            field.onChange(function () {
+                                checkSave();
+                                updateCurrentScan();
+                            });
+						} else if (fieldDef.ref == "scanOffset" || fieldDef.ref == "indexOffset") {
+							field.onChange(function () {
+								checkSave();
+								updateProbePos();
+							});
+						} else if (fieldDef.ref == "numProbes") {
+							field.onChange(function () {
+								checkSave();
+								setNumProbes();
+							});
+						} else if (fieldDef.ref == "skew") {
+							field.onChange(function () {
+								checkSave();
+								setSkew();
+							});
+						} else if (fieldDef.ref == "scan") {
+							scanHtmlElement = field.domElement;
+							$($(scanHtmlElement).children("select")[0]).attr("disabled", true);
+							field.onChange(function () {
+								checkSave();
+								changeScan();
+							});
+						} else if (fieldDef.ref == "numScans") {
+							field.onChange(function () {
+								checkSave();
+								setNumScans();
+							});
+						} else if (fieldDef.ref == "wedgeConfig" || fieldDef.ref == "probeConfig") {
+							field.onChange(function () {
+								checkSave();
+								updateProbeParams();
+								updateProbes();
+							});
+                        } else if (fieldDef.ref == "typeScan") {
+							field.onChange(function () {
+                                checkSave();
+                                updateSelectedElements();
+                                typeScanChanged();
+                            });
+						} else {
+							field.onChange(function () {
+								checkSave();
+							});
+						}
+
+						guiFields[fieldDef.ref] = field;
+					}
+					folders[cat.label].open();
+
+				}
+
+				gui.width = 400;
+				gui.open();
+
+				setAngle();
+				setProbePos();
+			}
+
+
+
+			function setCameraTop() {
+				cameras[s3di].position.set(0, 10, 0);
+				cameras[s3di].zoom = 1;
+				controls3d.update();
+				cameras[s3di].updateProjectionMatrix();
+				$("#btnTop").addClass("ui-active");
+				$("#btnSide").removeClass("ui-active");
+				$("#btnFront").removeClass("ui-active");
+				$("#btnFree").removeClass("ui-active");
+				render();
+			}
+
+			window.submit = function () {
+				saveResultScanPlan("boutonSubmit");
+			};
+
+
+			function saveResultScanPlan(provenance) {
+				if (provenance == "boutonSubmit") {
+					if (!$("#btnSubmit").hasClass("automatique")) {
+						if (confirm("Are you sure you want to submit the exercise?") != true) {
+							return;
+						}
+					}
+				}
+				var result = { "exercise_id": '.$exercise_id.', "responses": [] };
+				for (var i = 0; i < config.categories.length; i++) {
+					var cat = config.categories[i];
+					for (var j = 0; j < cat.fields.length; j++) {
+						var field = cat.fields[j];
+						//if (provenance != "boutonSubmit" || field.hasOwnProperty("answer")) {
+						//let fieldResult = { "parameter": field.label, "answer": field.answer, "response": null };
+						//let response = null;
+						if (field.hasOwnProperty("level")) {
+							if (field.level == "probe") {
+								//response = [];
+								for (var p = 0; p < probes.length; p++) {
+									//response.push(probes[p][field.ref]);
+									let answer = field.hasOwnProperty("answer") ? field.answer[p] : "";
+									let fieldResult = { "parameter": (field.label + " Probe " + (p + 1)), "answer": answer, "response": null };
+									fieldResult.response = probes[p][field.ref];
+									result.responses.push(fieldResult);
+								}
+							} else {
+								//response = [];
+								for (var p = 0; p < probes.length; p++) {
+									for (var s = 0; s < probes[p].scans.length; s++) {
+										//response.push(probes[p].scans[s][field.ref]);
+										let answer = field.hasOwnProperty("answer") ? field.answer[(p * 2) + s] : "";
+										let fieldResult = { "parameter": (field.label + " Probe " + (p + 1) + " Scan " + (s + 1)), "answer": answer, "response": null };
+										fieldResult.response = probes[p].scans[s][field.ref];
+										result.responses.push(fieldResult);
+									}
+								}
+							}
+						} else {
+							let fieldResult = { "parameter": field.label, "answer": (field.hasOwnProperty("answer") ? field.answer : ""), "response": null };
+							fieldResult.response = params[field.ref];
+							result.responses.push(fieldResult);
+							//response = params[field.ref];
+						}
+						//fieldResult.response = response;
+						//result.responses.push(fieldResult);
+						//}
+					}
+				}
+
+				var automatique = 0;
+				var submit = 0;
+				if ($("#btnSubmit").hasClass("automatique")) {
+					automatique = 1;
+				}
+
+				if (provenance == "boutonSubmit") {
+					submit = 1;
+					document.querySelector("#btnSubmit").disabled = true;
+				}
+
+				//enregistrementScanPlan(submit, automatique, result);
+			};
+
+			window.moveCamera = function (pos) {
+				controls3d.enabled = false;
+				selectedCamera = pos;
+				if (pos == "top") {
+					setCameraTop();
+				} else if (pos == "front") {
+					cameras[s3di].position.set(10, 0, 0);
+					cameras[s3di].zoom = 1;
+					controls3d.update();
+					cameras[s3di].updateProjectionMatrix();
+					$("#btnTop").removeClass("ui-active");
+					$("#btnSide").removeClass("ui-active");
+					$("#btnFront").addClass("ui-active");
+					$("#btnFree").removeClass("ui-active");
+					render();
+				} else if (pos == "side") {
+					cameras[s3di].position.set(0, 0, 10);
+					cameras[s3di].zoom = 1;
+					controls3d.update();
+					cameras[s3di].updateProjectionMatrix();
+					$("#btnTop").removeClass("ui-active");
+					$("#btnSide").addClass("ui-active");
+					$("#btnFront").removeClass("ui-active");
+					$("#btnFree").removeClass("ui-active");
+					render();
+				} else if (pos == "free") {
+					controls3d.enabled = true;
+					$("#btnTop").removeClass("ui-active");
+					$("#btnSide").removeClass("ui-active");
+					$("#btnFront").removeClass("ui-active");
+					$("#btnFree").addClass("ui-active");
+				}
+			}
+
+			function enregistrementScanPlan(submit, automatique, result) {
+
+				var userId = $("#userId").text();
+				var currentPid = $("#currentPid").text();
+				var noTransaction = $("#noTransaction").text();
+
+				// Ancienne methode GET
+				/*$.ajax({
+					async: 'true',
+					cache:false,
+					url:'index.php',
+					type: 'GET',
+					contentType: 'application/json; charset=utf-8',
+					dataType: 'json',
+					data: {
+						id:currentPid,
+						eID: 'enregistrementScanPlan',
+						userId:userId,
+						currentPid:currentPid,
+						noTransaction:noTransaction,
+						submit:submit,
+						automatique:automatique,
+						result:JSON.stringify(result),
+					},
+					success: AjaxSucceeded,
+					error: AjaxFailed
+				});*/
+
+				//Nouvelle méthode POST
+				$.post(
+					"index.php",
+								{
+						eID: "enregistrementScanPlan",
+						id: currentPid,
+						userId: userId,
+						currentPid: currentPid,
+						noTransaction: noTransaction,
+						submit: submit,
+						automatique: automatique,
+						result: result
+					},
+					function (data) {
+						if (submit == 1) {
+							window.location.reload();
+						}
+					}, "json"
+				);
+
+				function AjaxSucceeded(text) {
+					if (submit == 1) {
+						window.location.reload();
+					}
+				}
+
+				function AjaxFailed(text) {
+					console.log("Erreur dans la fonction AJAX ");
+				}
+
+			}
+
+			function loadAnswers() {
+				if (!answers || answers == "")
+					return;
+
+				answers = answers.replace("scanplan[", "[");
+
+				if (!answers || answers == "")
+					return;
+
+				let answersObj = $.parseJSON(answers);
+
+				let currentProbe = getValueFromAnswersObj(answersObj, "Probe");
+				let currentScan = getValueFromAnswersObj(answersObj, "Scan Probe " + currentProbe);
+
+				for (var i = 0; i < config.categories.length; i++) {
+					var cat = config.categories[i];
+					for (var j = 0; j < cat.fields.length; j++) {
+						var field = cat.fields[j];
+
+						if (field.hasOwnProperty("level")) {
+							if (field.level == "probe") {
+								for (var p = 0; p < probes.length; p++) {
+									let parameter = (field.label + " Probe " + (p + 1));
+									let value = getValueFromAnswersObj(answersObj, parameter);
+									probes[p][field.ref] = value;
+									if (p.toString() == (currentProbe - 1))
+										params[field.ref] = value;
+								}
+							} else {
+								for (var p = 0; p < probes.length; p++) {
+									for (var s = 0; s < probes[p].scans.length; s++) {
+										let parameter = (field.label + " Probe " + (p + 1) + " Scan " + (s + 1));
+										let value = getValueFromAnswersObj(answersObj, parameter);
+										probes[p].scans[s][field.ref] = value;
+										if (p.toString() == (currentProbe - 1) && s.toString() == (currentScan - 1))
+											params[field.ref] = value;
+									}
+								}
+							}
+						} else {
+							let parameter = field.label;
+							let value = getValueFromAnswersObj(answersObj, parameter);
+							params[field.ref] = value;
+						}
+					}
+				}
+				probes[0].currentScan = getValueFromAnswersObj(answersObj, "Scan Probe 1") - 1;
+				probes[1].currentScan = getValueFromAnswersObj(answersObj, "Scan Probe 2") - 1;
+
+				gui.updateDisplay();
+			}
+
+			function getValueFromAnswersObj(answers, parameter) {
+				for (let i = 0; i < answers.length; i++) {
+					if (answers[i].parameter == parameter)
+						return answers[i].response;
+				}
+				return null;
+			}
+
+			function init() {
+				let divHeight = $("#divThree").height();
+				let divWidth = $("#divThree").width();
+
+				var request = new XMLHttpRequest();
+				//request.open("GET", "/fileadmin/documents/exercise_config/scanplan/'.$exercise_id.'.json", true);
+                request.open("GET", "exercises/scanplan/1000.json", true);
+				request.responseType = "blob";
+				request.onload = function () {
+					var reader = new FileReader();
+					reader.readAsText(request.response);
+					reader.onload = function (e) {
+						config = $.parseJSON(e.target.result);
+						partInfo = config.partInfo;
+
+						$("#lblMaterial").html(partInfo.material);
+						$("#lblWeldType").html(partInfo.weldType);
+						$("#lblThickness").html(partInfo.height);
+						$("#lblLength").html(partInfo.length);
+						$("#lblTopCap").html(partInfo.topCap);
+						$("#lblBottomCap").html(partInfo.bottomCap);
+
+						loadGui();
+
+						loadAnswers();
+
+						updatePart();
+
+						updateProbes();
+
+						setCameraTop();
+
+						onWindowResize();
+					};
+				};
+				request.send();
+
+				containers[s3di] = document.getElementById("div3d");
+				containers[s2di] = document.getElementById("div2d");
+				scenes[s2di] = new THREE.Scene();
+				scenes[s2di].background = new THREE.Color(0xffffff);
+				scenes[s3di] = new THREE.Scene();
+				scenes[s3di].background = new THREE.Color(0xdddddd);
+				const width = divWidth;
+				const height = (divHeight / 2);
+				const frustumSize = 3;
+				const aspect = divWidth / (divHeight / 2);
+				cameras[s3di] = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 1, 2000);
+				cameras[s3di].position.set(0, 0, 10);
+				scenes[s3di].add(cameras[s3di]);
+				cameras[s2di] = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, 1, 2000);
+				cameras[s2di].position.set(0, 0, 10);
+				scenes[s2di].add(cameras[s2di]);
+				const shape = new THREE.Shape().moveTo(-1.8, partSceneInfo.halfHeight).lineTo(0, -partSceneInfo.halfHeight).lineTo(1.8, -partSceneInfo.halfHeight).lineTo(-1.7, partSceneInfo.halfHeight).lineTo(-1.8, partSceneInfo.halfHeight);
+				for (var i = 0; i < scenes.length; i++) {
+					renderers[i] = new THREE.WebGLRenderer({
+						antialias: true
+					});
+					renderers[i].autoClear = true;
+					renderers[i].setPixelRatio(window.devicePixelRatio);
+					renderers[i].setSize(width, height);
+					containers[i].appendChild(renderers[i].domElement);
+				}
+				window.addEventListener("resize", onWindowResize);
+				controls3d = new OrbitControls(cameras[s3di], renderers[s3di].domElement);
+				controls3d.addEventListener("change", changeControls3d);
+				controls3d.enabled = false;
+				//var json = \"{ "categories": [ { "label": "Part Info", "fields": [ { "label": "Width (mm)", "min": 10, "max": 1000, "step":2, "value": 300, "ref": "partWidth" },{ "label": "Length (mm)", "min": 10, "max": 1000, "step":2, "value": 200, "ref": "partLength" },{ "label": "Height (mm)", "min": 5, "max": 50, "step":1, "value": 28, "ref": "partHeight" },{ "label": "Part Speed (m/s)", "min": 2, "max": 4, "step":0.1, "value": 3.240, "ref": "partSpeed" }]}, { "label": "Probe Info", "fields": [ { "label": "Wedge Angle (º)", "min": 25, "max": 80, "step":0.1, "value": 36.1, "ref": "probeAngle" },{ "label": "Wedge Offset X (mm)", "min": 0, "max": 72.99, "step":0.1, "value": 70.26, "ref": "probeX" },{ "label": "Wedge Offset Y", "min": 0, "max": 46, "step":0.1, "value": 23, "ref": "probeY" },{ "label": "Wedge Offset Z", "min": 0, "max": 44.7, "step":0.1, "value": 17.23, "ref": "probeZ" },{ "label": "Wedge Length (mm)", "min": 10, "max": 100, "step":0.1, "value": 72.99, "ref": "probeL" },{ "label": "Wedge Width (mm)", "min": 10, "max": 100, "step":0.1, "value": 46, "ref": "probeW" },{ "label": "Wedge Height (mm)", "min": 10, "max": 100, "step":0.1, "value": 44.7, "ref": "probeH" },{ "label": "Wedge Speed (m/s)", "min": 1, "max": 3, "step":0.1, "value": 2.340, "ref": "wedgeSpeed" }]}, { "label": "Hardware & position", "fields": [ { "label": "Number of probes", "min": 1, "max": 2, "value": 1, "ref": "numProbes" }, { "label": "Probe", "options": [ "1", "2" ], "value": "1", "ref": "probe" }, { "label": "Skew (º)", "options": [ "0", "90", "180", "270" ], "value": "90", "ref": "skew" }, { "label": "Scan offset (mm)", "min": 0, "max": 9000, "value": 0, "ref": "scanOffset" }, { "label": "Index offset (mm)", "min": 0, "max": 100, "value": 15, "step": 0.5, "ref": "indexOffset" } ] }, { "label": "Scan", "fields": [ { "label": "Scan", "options": [ "1", "2" ], "value": "1", "ref": "scan" }, { "label": "Wave type", "options": [ "Shear", "Longitudinal" ], "value": "Shear", "ref": "waveType" }, { "label": "Type of Scan", "options": [ "L-Scan", "S-Scan" ], "value": "S-Scan", "ref": "typeScan" }, { "label": "Pulser", "min": 1, "max": 32, "value": 1, "ref": "pulser" }, { "label": "First element", "min": 1, "max": 32, "value": 12, "ref": "firstElement" }, { "label": "Number of elements", "min": 1, "max": 32, "value": 16, "ref": "numElements" }, { "label": "Start Angle (º)", "min": -90, "max": 90, "ref": "startAngle", "value": 35 }, { "label": "Stop Angle (º)", "min": -90, "max": 90, "ref": "stopAngle", "value": 70 }, { "label": "Angular resolution", "min": 0.1, "max": 5, "value": 1, "step": 0.1, "ref": "angularResolution" }, { "label": "Focus depth (mm)", "min": 0, "max": 1000, "value": 25, "ref": "focusDepth" } ] }, { "label": "UT settings", "fields": [ { "label": "Gain (dB)", "min": 0, "max": 100, "value": 10, "step": 0.5, "ref": "gain" }, { "label": "Start UT range (mm)", "min": 0, "max": 1000, "value": 10, "step": 1, "ref": "startUtRange" }, { "label": "Range UT range (mm)", "min": 1, "max": 1000, "value": 40, "step": 1, "ref": "rangeUtRange" }, { "label": "Energy (V)", "min": 50, "max": 200, "value": 100, "step": 50, "ref": "energy" }, { "label": "PRF (scan/s)", "min": 1, "max": 1000, "value": 100, "step": 1, "ref": "prf" }, { "label": "Filter (MHz)", "min": 0.5, "max": 20, "value": 5, "step": 0.25, "ref": "filter" }, { "label": "Video filter", "options": [ "On", "Off" ], "value": "Off", "ref": "videoFilter" }, { "label": "Reject (%)", "min": 0, "max": 100, "value": 0, "step": 1, "ref": "reject" }, { "label": "Point quantity", "min": 100, "max": 9000, "value": 0, "step": 100, "ref": "pointQuantity" } ] }, { "label": "Scanner settings", "fields": [ { "label": "Scan resolution (mm)", "min": 0.5, "max": 10, "value": 1, "step": 0.5, "ref": "scanResolution" }, { "label": "Start (mm)", "min": 0, "max": 10000, "value": 1, "step": 1, "ref": "start" }, { "label": "Stop (mm)", "min": 1, "max": 10000, "value": 300, "step": 1, "ref": "stop" } ] } ]}';
+				var partJson = '{"partWidth": 300, "partLength": 200, "partHeight": 28, "partSpeed": 3.240 }';
+				var probeWedgeJson = '{ "probes": [ { "id" : "A10 10L16", "elevation": 10, "pitch": 0.6, "elementQuantity": 16 },{ "id" : "A10 10L32", "elevation": 7, "pitch": 0.31, "elementQuantity": 32 },{ "id" : "A12 2.25L64", "elevation": 10, "pitch": 0.6, "elementQuantity": 64 },{ "id" : "A14 5L60", "elevation": 10, "pitch": 1, "elementQuantity": 60 },{ "id" : "A32 5L64", "elevation": 10, "pitch": 0.5, "elementQuantity": 64 } ], "wedges": [ { "id" : "SA10-N55S-SA 10L16", "speed": 2.340, "angle": 36.1, "X": 16.95, "Y": 11.5, "Z": 6.94, "L": 19.62, "W": 23, "H": 14.22 }, { "id" : "SA10-N55S-SA 10L32", "speed": 2.340, "angle": 36.1, "X": 17.17, "Y": 11.5, "Z": 6.78, "L": 19.61, "W": 23, "H": 14.22 }, { "id" : "SA12-N55S 2.25L64", "speed": 2.340, "angle": 36.1, "X": 70.26, "Y": 11.5, "Z": 17.23, "L": 72.99, "W": 23, "H": 44.7 }, { "id" : "SA14-N55S 5L60", "speed": 2.340, "angle": 36.1, "X": 91.90, "Y": 11.5, "Z": 8.08, "L": 95.54, "W": 23, "H": 49.03 }, { "id" : "SA32-N55S 2.25L64", "speed": 2.340, "angle": 36.1, "X": 55.52, "Y": 15, "Z": 11, "L": 61.50, "W": 30, "H": 33.15 }, { "id" : "SA32-N55S 5L64", "speed": 2.340, "angle": 36.1, "X": 55.52, "Y": 15, "Z": 11, "L": 61.50, "W": 30, "H": 33.15 } ]}';
+				//var json = '{ "categories": [ { "label": "Probe Info", "fields": [ { "label": "Probe", "options": ["A10 10L16","A10 10L32","A12 2.25L64","A14 5L60","A32 5L64"], "value": "A10 10L16", "ref": "probeConfig" },{ "label": "Wedge", "options": ["SA10-N55S-SA 10L16", "SA10-N55S-SA 10L32", "SA12-N55S 2.25L64", "SA14-N55S 5L60", "SA32-N55S 2.25L64", "SA32-N55S 5L64"], "value": "SA10-N55S-SA 10L16", "ref": "wedgeConfig" }]}, { "label": "Hardware & position", "fields": [ { "label": "Number of probes", "min": 1, "max": 2, "value": 1, "ref": "numProbes" }, { "label": "Probe", "options": [ "1", "2" ], "value": "1", "ref": "probe" }, { "label": "Skew (º)", "options": [ "0", "90", "180", "270" ], "value": "90", "ref": "skew" }, { "label": "Scan offset (mm)", "min": 0, "max": 9000, "value": 0, "ref": "scanOffset" }, { "label": "Index offset (mm)", "min": 0, "max": 100, "value": 15, "step": 0.5, "ref": "indexOffset" }, { "label": "Number of scans", "min": 1, "max": 2, "value": 1, "step": 1, "ref": "numScans" } ] }, { "label": "Scan", "fields": [ { "label": "Scan", "options": [ "1", "2" ], "value": "1", "ref": "scan" }, { "label": "Wave type", "options": [ "Shear", "Longitudinal" ], "value": "Shear", "ref": "waveType" }, { "label": "Type of Scan", "options": [ "L-Scan", "S-Scan" ], "value": "S-Scan", "ref": "typeScan" }, { "label": "Pulser", "min": 1, "max": 32, "value": 1, "ref": "pulser" }, { "label": "First element", "min": 1, "max": 32, "value": 12, "ref": "firstElement" }, { "label": "Number of elements", "min": 1, "max": 32, "value": 16, "ref": "numElements" }, { "label": "Start Angle (º)", "min": -90, "max": 90, "ref": "startAngle", "value": 35 }, { "label": "Stop Angle (º)", "min": -90, "max": 90, "ref": "stopAngle", "value": 70 }, { "label": "Angular resolution", "min": 0.1, "max": 5, "value": 1, "step": 0.1, "ref": "angularResolution" }, { "label": "Focus depth (mm)", "min": 0, "max": 1000, "value": 25, "ref": "focusDepth" }, { "label": "Start UT range (mm)", "min": 0, "max": 1000, "value": 10, "step": 1, "ref": "startUtRange" }, { "label": "Range UT range (mm)", "min": 1, "max": 1000, "value": 40, "step": 1, "ref": "rangeUtRange" } ] }, { "label": "UT settings", "fields": [ { "label": "Gain (dB)", "min": 0, "max": 100, "value": 10, "step": 0.5, "ref": "gain" }, { "label": "Energy (V)", "min": 50, "max": 200, "value": 100, "step": 50, "ref": "energy" }, { "label": "PRF (scan/s)", "min": 1, "max": 1000, "value": 100, "step": 1, "ref": "prf" }, { "label": "Filter (MHz)", "min": 0.5, "max": 20, "value": 5, "step": 0.25, "ref": "filter" }, { "label": "Video filter", "options": [ "On", "Off" ], "value": "Off", "ref": "videoFilter" }, { "label": "Reject (%)", "min": 0, "max": 100, "value": 0, "step": 1, "ref": "reject" }, { "label": "Point quantity", "min": 100, "max": 9000, "value": 0, "step": 100, "ref": "pointQuantity" } ] }, { "label": "Scanner settings", "fields": [ { "label": "Scan resolution (mm)", "min": 0.5, "max": 10, "value": 1, "step": 0.5, "ref": "scanResolution" }, { "label": "Start (mm)", "min": 0, "max": 10000, "value": 1, "step": 1, "ref": "start" }, { "label": "Stop (mm)", "min": 1, "max": 10000, "value": 300, "step": 1, "ref": "stop" } ] } ]}';
+				partConfig = $.parseJSON(partJson);
+				probeWedgeConfig = $.parseJSON(probeWedgeJson);
+			}
+
+			function getProbeConfig() {
+				for (var i = 0; i < probeWedgeConfig.probes.length; i++) {
+					if (probeWedgeConfig.probes[i].id == params.probeConfig)
+						return probeWedgeConfig.probes[i];
+				}
+				return null;
+			}
+
+			function getWedgeConfig() {
+				for (var i = 0; i < probeWedgeConfig.wedges.length; i++) {
+					if (probeWedgeConfig.wedges[i].id == params.wedgeConfig)
+						return probeWedgeConfig.wedges[i];
+				}
+				return null;
+			}
+
+			function changeControls3d() {
+				$("#btnTop").removeClass("ui-active");
+				$("#btnSide").removeClass("ui-active");
+				$("#btnFront").removeClass("ui-active");
+
+				render();
+			}
+
+			function setUnselected(obj, unselected) {
+				if (!obj == null) return;
+
+				if (obj.children) {
+					obj.children.forEach((child) => {
+						setUnselected(child, unselected);
+					});
+				}
+				if (obj.material) {
+					if (unselected) {
+						if (obj.material.transparent) {
+							obj.material.opacity = 0.3;
+							obj.material.color.setHex(0xbbbbbb);
+						}
+						if (obj.name.startsWith("line")) {
+							obj.material.color.setHex(0xbbbbbb);
+						}
+					}
+					else {
+						if (obj.material.transparent) {
+							obj.material.opacity = obj.name.startsWith("semi") ? 0.7 : 1.0;
+						}
+						if (obj.name.startsWith("lineScan")) {
+							obj.material.color.setHex(0xff0000);
+						} else if (obj.name.startsWith("lineFocus")) {
+							obj.material.color.setHex(0x0000ff);
+						}
+					}
+				};
+
+			}
+
+			function drawProbe(probeIndex, sceneIndex) {
+
+				let scanParams = probes[probeIndex].scans[probes[probeIndex].currentScan];
+
+				let xMin = - probeSceneInfo.halfWidth;
+				let xMax = -xMin;
+				let xMid = xMax - probeSceneInfo.slopeWidth;
+
+				if (xMid > xMax)
+					xMid = xMax;
+				if (xMid < xMin)
+					xMid = xMin;
+
+				let yMax = probeSceneInfo.halfHeight;
+				let yMin = -yMax;
+				let yMid = yMin + probeSceneInfo.slopeHeight;
+
+				if (yMid > yMax)
+					yMid = yMax;
+				if (yMid < yMin)
+					yMid = yMin;
+
+				const pts = [];
+
+				var group = new THREE.Group();
+				pts.push(new THREE.Vector2(xMin, yMin));
+				pts.push(new THREE.Vector2(xMin, yMid));
+				pts.push(new THREE.Vector2(xMid, yMax));
+				pts.push(new THREE.Vector2(xMax, yMin));
+
+				const shape = new THREE.Shape(pts);
+
+				const pts2 = [];
+
+				pts2.push(new THREE.Vector2(xMid, yMax));
+				pts2.push(new THREE.Vector2(xMax, yMax));
+				pts2.push(new THREE.Vector2(xMax, yMin));
+
+				const shape2 = new THREE.Shape(pts2);
+
+				const extrudeSettings = { depth: probeSceneInfo.length, bevelEnabled: false, bevelSegments: 0, steps: 2, bevelSize: 0, bevelThickness: 0 };
+
+				var probeBoxColorMat = new THREE.MeshBasicMaterial({ color: 0x9fc5e8, transparent: true, opacity: 0.7 });
+
+				var probeGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+
+				var probeMesh = new THREE.Mesh(probeGeo, probeBoxColorMat);
+				probeMesh.name = "semiProbeMesh";
+				probeMesh.position.set(0, 0, -probeSceneInfo.halfLength);
+
+				var geoLines = new THREE.EdgesGeometry(probeMesh.geometry);
+				var matLines = new THREE.LineBasicMaterial({ color: 0x0b5394, transparent: true });
+
+				var wireframe = new THREE.LineSegments(geoLines, matLines);
+				probeMesh.add(wireframe);
+				group.add(probeMesh);
+
+				var probeBoxColorMat2 = new THREE.MeshBasicMaterial({ color: 0x6fa8dc, transparent: true, opacity: 0.7 });
+				var probeGeo2 = new THREE.ExtrudeGeometry(shape2, extrudeSettings);
+
+				var probeMesh2 = new THREE.Mesh(probeGeo2, probeBoxColorMat2);
+				probeMesh2.name = "semiProbeMesh2";
+				probeMesh2.position.set(0, 0, -probeSceneInfo.halfLength);
+				probesBoxObjs[probeIndex][sceneIndex] = probeMesh;
+				//if (probeIndex == 0 && sceneIndex == s2di) {
+				//	probeDrag1 = probeMesh;
+				//	probeDrag2 = probeMesh2;
+				//}
+				var geoLines2 = new THREE.EdgesGeometry(probeMesh2.geometry);
+				var wireframe2 = new THREE.LineSegments(geoLines2, matLines);
+				probeMesh2.add(wireframe2);
+				group.add(probeMesh2);
+
+				let numElements = probeInfo.elementQuantity;
+
+				var elementGroup = new THREE.Group();
+
+				for (var i = 0; i < numElements; i++) {
+					var elementGeo = new THREE.BoxGeometry(probeSceneInfo.elementWidth, probeSceneInfo.elementHeight, probeSceneInfo.elementLength);
+					var elementColorMat = new THREE.MeshBasicMaterial({ color: 0xcccccc, transparent: true });
+					var elementMesh = new THREE.Mesh(elementGeo, elementColorMat);
+
+					var elementPos = getPosFromElementIndex(i);
+					var elementPosZ = probeSceneInfo.halfLength - probeSceneInfo.y;
+
+					elementMesh.translateX(elementPos.x);
+					elementMesh.translateY(elementPos.y);
+					elementMesh.translateZ(elementPosZ);
+
+					var geoElementLines = new THREE.EdgesGeometry(elementMesh.geometry);
+
+					var elementMat = new THREE.LineBasicMaterial({ color: 0x222222, transparent: true });
+					//if ((i + 1) == scanParams.firstElement)
+					//	elementMat = matFirstElementLines;
+                    if ((i + 1) > scanParams.firstElement && ((i + 1) < (getNumberOfElements(scanParams) + scanParams.firstElement)))
+						elementMat = new THREE.LineBasicMaterial({ color: 0x00ff00, transparent: true });
+
+					var elementWireframe = new THREE.LineSegments(geoElementLines, elementMat);
+					elementWireframe.name = "lines";
+
+					rotateAboutPoint(elementMesh, new THREE.Vector3(elementPos.x, elementPos.y, 0), new THREE.Vector3(0, 0, 1), probeInfo.angle);
+					elementMesh.add(elementWireframe);
+
+					elementMesh.name = "element_" + i;
+					elementGroup.add(elementMesh);
+				}
+				elementGroup.name = "elements";
+				group.add(elementGroup);
+				group.position.set(0, ((probeSceneInfo.height - partSceneInfo.height) / 2) + partSceneInfo.height, 0);
+				group.isDraggable = true;
+				return group;
+
+			}
+
+			function updateSelectedElements() {
+				var scanIndex = probes[params.probe - 1].currentScan;
+
+				Object.keys(probes[params.probe - 1].scans[scanIndex]).forEach(key => {
+					probes[params.probe - 1].scans[scanIndex][key] = params[key];
+				});
+
+
+				var currentProbe = probes[params.probe - 1];
+				for (var j = 0; j < currentProbe.groups.length; j++) {
+					let group = currentProbe.groups[j];
+
+					let elementsGroup = group.children.filter(function (item) {
+						return item.name == "elements";
+					});
+
+					if (elementsGroup.length > 0) {
+						let scanParams = currentProbe.scans[currentProbe.currentScan];
+						for (var i = 0; i < getProbeConfig().elementQuantity; i++) {
+
+							let selected = ((i + 1) >= scanParams.firstElement && ((i + 1) < (getNumberOfElements(scanParams) + scanParams.firstElement)));
+
+							let element = elementsGroup[0].children.filter(function (item) {
+								return item.name == "element_" + i;
+							});
+
+							if (element.length > 0) {
+
+								let lines = element[0].children.filter(function (item) {
+									return item.name == "lines";
+								});
+								lines[0].material.color.setHex(selected ? 0x00ff00 : 0x222222);
+							}
+						}
+					}
+
+				}
+
+				updateCurrentScan();
+			}
+
+			function updateProbeRays(group, probe, probeSelected, allScans) {
+
+				let scanIndexes = [];
+
+				if (allScans) {
+					for (var s = 0; s < params.numScans; s++) {
+						if (s != probe.currentScan) scanIndexes.push(s);
+					}
+				}
+
+				scanIndexes.push(probe.currentScan);
+
+				for (var s = 0; s < scanIndexes.length; s++) {
+					let index = scanIndexes[s];
+					let scanParams = probe.scans[index];
+					let selected = (probeSelected && index == probe.currentScan);
+					let rayIndex = 0;
+					if (scanParams.typeScan == "S-Scan") {
+						for (var a = scanParams.startAngle; a < scanParams.stopAngle; a += scanParams.angularResolution) {
+							drawRay(group, toRadians(a), probe, selected, index, rayIndex++);
+						}
+						drawRay(group, toRadians(scanParams.stopAngle), probe, selected, index, rayIndex++);
+					}
+					else {
+						let elStart = scanParams.firstElement;
+						let elEnd = scanParams.lScanLastElement;
+						if (elEnd > probeInfo.elementQuantity)
+							elEnd = probeInfo.elementQuantity;
+
+						let inside = true;
+                        let groupStart = elStart;
+						while (inside) {
+							let groupEnd = groupStart + scanParams.numElements - 1;
+
+							if (groupEnd > elEnd) {
+								inside = false;
+								break;
+							}
+							
+                            drawRay(group, toRadians(scanParams.lScanAngle), probe, selected, index, rayIndex++, groupStart, scanParams.numElements);
+
+							groupStart += scanParams.lScanStep;
+						}
+
+					}
+					removeExtraRays(group, index, rayIndex, "lineScan");
+					removeExtraRays(group, index, rayIndex, "lineScanBack");
+					drawFocusDepth(group, probe, scanParams, selected, index);
+				}
+			}
+
+			function findXCoordFromPointsInLine(coord1, coord2, y) {
+				if (coord1 == null || coord2 == null)
+					return;
+
+				// Calculate the slope of the line
+				const slope = (coord2.y - coord1.y) / (coord2.x - coord1.x);
+
+				// Calculate the y-intercept of the line
+				const yIntercept = coord1.y - slope * coord1.x;
+
+				let x = (y - yIntercept) / slope;
+
+				return x;
+			}
+
+            function getRayDepthPoints(group, probe, scanParams, depth, margin, angle1, angle2, elementStart, elementQuantity) {
+				let height = 0;
+				let posX1 = null;
+				let posX2 = null;
+				let half = 1;
+				let rayPoints1 = null;
+                let rayPoints2 = null;
+
+				if (depth <= 0 || depth == partInfo.height || depth >= (partInfo.height * 2))
+					return;
+
+				if (scanParams.typeScan == "S-Scan") {
+					if (!angle1)
+						angle1 = toRadians(scanParams.startAngle);
+					if (!angle2)
+						angle2 = toRadians(scanParams.stopAngle);
+
+					rayPoints1 = getRayPoints(group, angle1, probe, scanParams);
+					rayPoints2 = getRayPoints(group, angle2, probe, scanParams);
+				} else {
+					if (!elementStart) {
+
+						let elStart = scanParams.firstElement;
+						let elEnd = scanParams.lScanLastElement;
+						if (elEnd > (probeInfo.elementQuantity - 1))
+							elEnd = probeInfo.elementQuantity - 1;
+
+						let inside = true;
+						let groupStart = elStart;
+						while (inside) {
+                            let groupEnd = groupStart + scanParams.numElements;
+
+							if (groupEnd > elEnd) {
+								inside = false;
+								break;
+							}
+
+							if (rayPoints1 == null)
+                                rayPoints1 = getRayPoints(group, toRadians(scanParams.lScanAngle), probe, scanParams, groupStart, scanParams.numElements);
+
+							groupStart += scanParams.lScanStep;
+						}
+						groupStart -= scanParams.lScanStep;
+                        rayPoints2 = getRayPoints(group, toRadians(scanParams.lScanAngle), probe, scanParams, groupStart, scanParams.numElements);
+					}
+					else {
+						rayPoints1 = getRayPoints(group, toRadians(scanParams.lScanAngle), probe, scanParams, elementStart, elementQuantity);
+                        rayPoints2 = getRayPoints(group, toRadians(scanParams.lScanAngle), probe, scanParams, elementStart, elementQuantity);
+					}
+				}
+
+
+				if (depth < partInfo.height) {
+					half = 1;
+					height = depth;
+
+					var posY = -probeSceneInfo.halfHeight - toSceneUnits(height);
+
+					if (rayPoints2.points.length > 2) {
+						if (rayPoints1.points.length > 2) {
+							posX1 = findXCoordFromPointsInLine(rayPoints1.points[1], rayPoints1.points[2], posY) - margin;
+						}
+						else {
+							posX1 = rayPoints1.limit1;
+						}
+
+						posX2 = findXCoordFromPointsInLine(rayPoints2.points[1], rayPoints2.points[2], posY) + margin;
+
+						if (posX1 < rayPoints1.limit1) {
+							posX1 = rayPoints1.limit1;
+						}
+						if (posX2 < rayPoints1.limit1) {
+							posX2 = rayPoints1.limit1;
+						}
+
+						if (posX1 > rayPoints2.limit2) {
+							posX1 = rayPoints2.limit2;
+						}
+						if (posX2 > rayPoints2.limit2) {
+							posX2 = rayPoints2.limit2;
+						}
+					}
+
+				} else if (depth > partInfo.height && depth < (partInfo.height * 2)) {
+					half = 2;
+					height = partInfo.height - (depth - partInfo.height);
+
+					var posY = -probeSceneInfo.halfHeight - toSceneUnits(height);
+
+					if (rayPoints1.points.length > 3) {
+						if (rayPoints2.points.length > 3) {
+
+							posX2 = findXCoordFromPointsInLine(rayPoints2.points[2], rayPoints2.points[3], posY) + margin;
+						}
+						else {
+							posX2 = rayPoints2.limit2;
+						}
+
+						posX1 = findXCoordFromPointsInLine(rayPoints1.points[2], rayPoints1.points[3], posY) - margin;
+
+						if (posX1 < rayPoints1.limit1) {
+							posX1 = rayPoints1.limit1;
+						}
+
+						if (posX2 > rayPoints2.limit2) {
+							posX2 = rayPoints2.limit2;
+						}
+
+					}
+				}
+				let sceneHeight = toSceneUnits(height);
+				var posY = -probeSceneInfo.halfHeight - sceneHeight;
+				var posZ = probeSceneInfo.halfLength - probeSceneInfo.y;
+
+				return { posX1: posX1, posX2: posX2, posY: posY, posZ: posZ };
+			}
+
+            function drawFocusDepth(group, probe, scanParams, probeSelected, scanIndex) {
+				if (!probeSceneInfo.halfLength)
+					return;
+
+				let focusDepth = scanParams.focusDepth;
+                let rayPoints = getRayDepthPoints(group, probe, scanParams, focusDepth, 0.2);
+
+				let name = "lineFocus_" + scanIndex;
+
+				let focusElement = group.children.filter(function (item) {
+					return item.name == name;
+				});
+
+				let addLine = true;
+
+				if (focusElement != null && focusElement.length > 0 && focusElement[0].geometry != null) {
+					group.remove(focusElement[0]);
+				}
+
+				if (rayPoints != null && rayPoints.posX1 != null && rayPoints.posX2 != null) {
+
+					let points = [];
+
+					points.push(new THREE.Vector3(rayPoints.posX1, rayPoints.posY, rayPoints.posZ));
+					points.push(new THREE.Vector3(rayPoints.posX2, rayPoints.posY, rayPoints.posZ));
+
+					const geometryPoints = new THREE.BufferGeometry().setFromPoints(points);
+
+					var line = new THREE.Line(geometryPoints, new THREE.LineDashedMaterial({ color: (probeSelected ? 0x0000ff : 0xbbbbbb), dashSize: 3, gapSize: 1, linewidth: 1, scale: 25, }));
+					line.computeLineDistances();
+					line.name = name
+
+					group.add(line);
+				}
+			}
+
+			function getNumberOfElements(scanParams) {
+				return scanParams.typeScan == "S-Scan" ? scanParams.numElements : (scanParams.lScanLastElement - scanParams.firstElement + 1);
+			}
+
+			function getRayPoints(group, angle, probe, scanParams, elementStart, elementQuantity) {
+				//let scanParams = probe.scans[probe.currentScan];
+
+				if (elementStart == null)
+					elementStart = scanParams.firstElement;
+				if (elementQuantity == null)
+					elementQuantity = getNumberOfElements(scanParams);
+
+				var checkCenterStartPos = getPosFromElementIndex(elementStart - 1);
+				var numPitches = elementQuantity - 1;
+				if (elementStart + elementQuantity > probeInfo.elementQuantity) {
+					numPitches = probeInfo.elementQuantity - elementStart;
+				}
+				var totalPitch = numPitches * probeSceneInfo.pitch;
+				var halfPitch = totalPitch / 2;
+				let elementCenter = getPosFromPitch(checkCenterStartPos, halfPitch);
+
+				if (scanParams.typeScan == "L-Scan") {
+					console.log("-------");
+					console.log("START  = " + elementStart);
+					console.log("NUM    = " + elementQuantity);
+					console.log("CENTER = " + elementCenter.x + ", " + elementCenter.y);
+                    console.log("-------");
+				}
+
+				var posZ = probeSceneInfo.halfLength - probeSceneInfo.y;
+
+				var rayAngle = Math.asin((getWedgeConfig().speed * Math.sin(angle)) / partConfig.partSpeed);
+
+				var yPos = -probeSceneInfo.halfHeight;
+				//var xWidth = (probeSceneInfo.y) * Math.tan(rayAngle);
+				var xWidth = (Math.abs(yPos - elementCenter.y) * Math.tan(rayAngle));
+				var xPos = elementCenter.x + xWidth;
+
+				var yPos2 = yPos - partSceneInfo.height;
+				var xWidth2 = partSceneInfo.height * Math.tan(angle);
+				var xPos2 = xPos + xWidth2;
+				var xPos3 = xPos2 + xWidth2;
+
+				const points = [];
+				points.push(new THREE.Vector3(elementCenter.x, elementCenter.y, posZ));
+				points.push(new THREE.Vector3(xPos, yPos, posZ));
+
+				var limit1 = (probe.skew == 90 || probe.skew == 270) ? -partSceneInfo.halfWidth : -partSceneInfo.halfLength;
+				var limit2 = (probe.skew == 90 || probe.skew == 270) ? partSceneInfo.halfWidth : partSceneInfo.halfLength;
+
+				var currentPosDiff = group.position.x;
+				if (probe.skew == 0)
+					currentPosDiff = group.position.z;
+				else if (probe.skew == 180)
+					currentPosDiff = -group.position.z;
+				else if (probe.skew == 270)
+					currentPosDiff = -group.position.x;
+
+				if ((xPos + currentPosDiff) >= limit1 && (xPos + currentPosDiff) <= limit2) {
+
+					if ((xPos2 + currentPosDiff) > limit2) {
+						var newXPos2 = limit2 - currentPosDiff;
+						var xDiff = (newXPos2 - xPos);
+						var angle2 = toRadians(90) - angle;
+						var yDiff = xDiff * Math.tan(angle2);
+						var newYPos2 = yPos - yDiff;
+						points.push(new THREE.Vector3(newXPos2, newYPos2, posZ));
+					} else if ((xPos2 + currentPosDiff) < limit1) {
+						var newXPos2 = limit1 - currentPosDiff;
+						var xDiff = (newXPos2 - xPos);
+						var angle2 = toRadians(90) - angle;
+						var yDiff = xDiff * Math.tan(angle2);
+						var newYPos2 = yPos - yDiff;
+						points.push(new THREE.Vector3(newXPos2, newYPos2, posZ));
+					} else {
+
+						points.push(new THREE.Vector3(xPos2, yPos2, posZ));
+						//if(scanParams.focusDepth > partInfo.height){
+						if ((xPos3 + currentPosDiff) > limit2) {
+							var newXPos3 = limit2 - currentPosDiff;
+							var xDiff = (newXPos3 - xPos2);
+							var angle2 = toRadians(90) - angle;
+							var yDiff = xDiff * Math.tan(angle2);
+							var newYPos3 = yPos2 + yDiff;
+							points.push(new THREE.Vector3(newXPos3, newYPos3, posZ));
+						} else if ((xPos3 + currentPosDiff) < limit1) {
+							var newXPos3 = limit1 - currentPosDiff;
+							var xDiff = (newXPos3 - xPos2);
+							var angle2 = toRadians(90) - angle;
+							var yDiff = xDiff * Math.tan(angle2);
+							var newYPos3 = yPos2 + yDiff;
+							points.push(new THREE.Vector3(newXPos3, newYPos3, posZ));
+						} else {
+							points.push(new THREE.Vector3(xPos3, yPos, posZ));
+						}
+						//}
+					}
+				}
+
+				return { points: points, limit1: limit1 - currentPosDiff, limit2: limit2 - currentPosDiff };
+			}
+
+            function drawRay(group, angle, probe, selected, scanIndex, rayIndex, elementStart, elementQuantity) {
+
+				if (!probeSceneInfo.halfLength)
+					return;
+
+				let scanParams = probe.scans[scanIndex];
+
+				let rangeStart = scanParams.startUtRange;
+				let rangeStop = rangeStart + scanParams.rangeUtRange;
+
+				if (rangeStop == 0)
+					return;
+
+				let rayPointsStart = null;
+				if (rangeStart > 0)
+                    rayPointsStart = getRayDepthPoints(group, probe, scanParams, rangeStart, 0, angle, angle, elementStart, elementQuantity);
+
+				let rayPointsStop = null;
+				if (rangeStop < (partInfo.height * 2))
+                    rayPointsStop = getRayDepthPoints(group, probe, scanParams, rangeStop, 0, angle, angle, elementStart, elementQuantity);
+
+				let points = getRayPoints(group, angle, probe, scanParams, elementStart, elementQuantity);
+
+				if (points.points != null && (rangeStart > 0 || rangeStop < (partInfo.height * 2))) {
+					let nameBack = "lineScanBack_" + scanIndex + "_" + rayIndex;
+					updateRayPoints(probe, group, points.points, nameBack, 0x555555);
+				}
+
+				if (rangeStart > 0) {
+
+					if (rangeStart < (partInfo.height * 2)) {
+						var pointsToRemove = rangeStart < partInfo.height ? 2 : 3;
+						if (rayPointsStart != null) {
+							var newPoint = new THREE.Vector3(rayPointsStart.posX1, rayPointsStart.posY, rayPointsStart.posZ);
+
+							points.points.splice(0, pointsToRemove);
+							if ((rangeStart <= partInfo.height && newPoint.y > points.points[0].y) || (rangeStart > partInfo.height && points.points.length > 0 && newPoint.y < points.points[0].y))
+								points.points.splice(0, 0, newPoint);
+						}
+						else {
+							points.points.splice(0, pointsToRemove - 1);
+						}
+					} else {
+						return;
+					}
+				}
+
+				if (rangeStop > partInfo.height) {
+					let expectedNumPoints = (rangeStart > 0 ? (rangeStart >= partInfo.height ? 2 : 3) : 4);
+					if (rayPointsStop && rayPointsStop != null && points != null && points.points.length == expectedNumPoints && rayPointsStop.posY < points.points[points.points.length - 1].y) {
+						points.points[points.points.length - 1] = new THREE.Vector3(rayPointsStop.posX1, rayPointsStop.posY, rayPointsStop.posZ);
+					}
+				} else {
+					let expectedNumPoints = (rangeStart > 0 ? (rangeStart >= partInfo.height ? 0 : 2) : 3);
+					while (points.points.length > expectedNumPoints)
+						points.points.pop();
+					if (rayPointsStop && rayPointsStop != null && rayPointsStop.posY > points.points[points.points.length - 1].y)
+						points.points[points.points.length - 1] = new THREE.Vector3(rayPointsStop.posX1, rayPointsStop.posY, rayPointsStop.posZ);
+
+				}
+
+				if (points.points != null) {
+
+					if (scanParams.focusDepth <= partInfo.height) {
+						if (rangeStart < partInfo.height) {
+							points.points.pop();
+						}
+						else {
+							return;
+						}
+					}
+
+					let name = "lineScan_" + scanIndex + "_" + rayIndex;
+					updateRayPoints(probe, group, points.points, name, (selected ? 0xff0000 : 0xbbbbbb), selected);
+				}
+			}
+
+			function removeExtraRays(group, scanIndex, rayIndex, prefix) {
+				let exists = true;
+				while (exists) {
+					let name = prefix + "_" + scanIndex + "_" + rayIndex;
+					let rayElement = group.children.filter(function (item) {
+						return item.name == name;
+					});
+					if (rayElement == null || rayElement.length == 0) {
+						exists = false;
+						break;
+					}
+					group.remove(rayElement[0]);
+
+					rayIndex++;
+				}
+			}
+
+			function updateRayPoints(probe, group, points, name, rayColor, selected) {
+
+				if (selected && group.name == "g1" && (probe.skew == "90" || probe.skew == "270")) {
+					for (var i = 0; i < points.length; i++) {
+						points[i].z = (probe.skew == "90" ? partSceneInfo.halfLength : -partSceneInfo.halfLength);
+					}
+				}
+
+				let rayElement = group.children.filter(function (item) {
+					return item.name == name;
+				});
+
+				let addLine = true;
+
+				if (rayElement != null && rayElement.length > 0 && rayElement[0].geometry != null) {
+
+					let pos = rayElement[0].geometry.attributes.position;
+
+					if (pos.count != points.length) {
+						group.remove(rayElement[0]);
+					} else {
+						addLine = false;
+						for (var p = 0; p < pos.count; p++) {
+							let vertex = new THREE.Vector3().fromBufferAttribute(pos, p);
+							if (differentPointCoords(vertex, points[p])) {
+								rayElement[0].geometry.attributes.position.setXYZ(p, points[p].x, points[p].y, points[p].z);
+								rayElement[0].geometry.attributes.position.needsUpdate = true;
+							}
+						}
+					}
+
+				}
+
+				if (addLine) {
+					const geometryPoints = new THREE.BufferGeometry().setFromPoints(points);
+
+					var line = new THREE.Line(geometryPoints, new THREE.LineBasicMaterial({ color: rayColor }));
+					line.name = name;
+
+					group.add(line);
+				}
+
+			}
+
+			function differentPointCoords(p1, p2) {
+				//return true;
+				return (p1.x != p2.x) || (p1.y != p2.y) || (p1.z != p2.z);
+				/*return (Math.round(p1.x * 100) != Math.round(p2.x * 100)) ||
+					(Math.round(p1.y * 100) != Math.round(p2.y * 100)) ||
+					(Math.round(p1.z * 100) != Math.round(p2.z * 100));*/
+			}
+
+			function getPosFromElementIndex(index) {
+				var totalPitch = index * probeSceneInfo.pitch;
+				var elementPosX = -probeSceneInfo.halfWidth + (probeSceneInfo.width - probeSceneInfo.x);
+				var elementPosY = -probeSceneInfo.halfHeight + probeSceneInfo.z + (probeSceneInfo.elementHeight / 2);
+
+				let firstElementPos = new THREE.Vector2(elementPosX, elementPosY);
+
+				return getPosFromPitch(firstElementPos, totalPitch);
+			}
+
+			function getPosFromPitch(startPos, pitch) {
+				var elementPosX = startPos.x + pitch * Math.cos(probeInfo.angle);
+				var elementPosY = startPos.y + pitch * Math.sin(probeInfo.angle);
+				return new THREE.Vector2(elementPosX, elementPosY);
+			}
+
+			function rotateAboutPoint(obj, point, axis, theta, pointIsWorld) {
+				pointIsWorld = (pointIsWorld === undefined) ? false : pointIsWorld;
+
+				if (pointIsWorld) {
+					obj.parent.localToWorld(obj.position); // compensate for world coordinate
+				}
+
+				obj.position.sub(point); // remove the offset
+				obj.position.applyAxisAngle(axis, theta); // rotate the POSITION
+				obj.position.add(point); // re-add the offset
+
+				if (pointIsWorld) {
+					obj.parent.worldToLocal(obj.position); // undo world coordinates compensation
+				}
+
+				obj.rotateOnAxis(axis, theta); // rotate the OBJECT
+			}
+
+			function setNumProbes() {
+				for (var i = 0; i < probes.length; i++) {
+					probes[i].groups[s2di].visible = probes[i].groups[s3di].visible = (i + 1) <= params.numProbes;
+				}
+				//probeGroup2d2.visible = probeGroup3d2.visible = params.numProbes == 2;
+				if (params.numProbes == 1) {
+					$($(probeHtmlElement).children("select")[0]).attr("disabled", true);
+					if (params.probe == 2) {
+						params.probe = 1;
+						changeProbe();
+					}
+				} else {
+					$($(probeHtmlElement).children("select")[0]).attr("disabled", false);
+				}
+				setProbePos();
+			}
+
+			function setNumScans() {
+
+				if (params.numScans == 1) {
+					$($(scanHtmlElement).children("select")[0]).attr("disabled", true);
+					if (params.scan == 2) {
+						params.scan = 1;
+						changeScan();
+					}
+				} else {
+					$($(scanHtmlElement).children("select")[0]).attr("disabled", false);
+				}
+				setProbePos();
+			}
+
+			function changeScan() {
+				probes[params.probe - 1].currentScan = params.scan - 1;
+				changeProbe();
+			}
+
+			function changeProbe() {
+
+				Object.keys(probes[params.probe - 1]).forEach(key => {
+					if (params.hasOwnProperty(key)) {
+						params[key] = probes[params.probe - 1][key];
+					}
+				});
+
+				params.scan = probes[params.probe - 1].currentScan + 1;
+
+				var scanIndex = probes[params.probe - 1].currentScan;
+
+				Object.keys(probes[params.probe - 1].scans[scanIndex]).forEach(key => {
+                    
+					params[key] = probes[params.probe - 1].scans[scanIndex][key];
+				});
+
+				for (var i = 0; i < probes.length; i++) {
+					for (var j = 0; j < probes[i].groups.length; j++) {
+						var unselected = (i + 1) != params.probe;
+						setUnselected(probes[i].groups[j], unselected);
+					}
+				}
+				updateProbes();
+				typeScanChanged();
+
+				render();
+				gui.updateDisplay();
+			}
+
+			function updateProbePos() {
+				Object.keys(probes[params.probe - 1]).forEach(key => {
+					if (params.hasOwnProperty(key)) {
+						probes[params.probe - 1][key] = params[key];
+					}
+				});
+				setProbePos();
+			}
+
+			function setSkew() {
+				probes[params.probe - 1].skew = params.skew;
+
+				setProbePos();
+			}
+
+			function setProbePos() {
+
+				for (var i = 0; i < probes.length; i++) {
+					let degrees = probes[i].skew - 90;
+					let radians = degrees * (Math.PI / 180);
+
+					let xDiff = toSceneUnits(probes[i].indexOffset);
+					if (degrees == 0)
+						xDiff -= probeSceneInfo.halfWidth;
+					else if (degrees == 180)
+						xDiff += probeSceneInfo.halfWidth;
+
+					let zDiff = -toSceneUnits(probes[i].scanOffset - (partInfo.length / 2));
+					if (degrees == -90)
+						zDiff -= probeSceneInfo.halfWidth;
+					else if (degrees == 90)
+						zDiff += probeSceneInfo.halfWidth;
+
+					for (var j = 0; j < probes[i].groups.length; j++) {
+						probes[i].groups[j].rotation.y = radians;
+						probes[i].groups[j].position.setX(xDiff);
+						probes[i].groups[j].position.setZ(zDiff);
+
+						updateProbeRays(probes[i].groups[j], probes[i], (params.probe - 1 == i), true);
+					}
+				}
+
+				render();
+			}
+
+			function updateCurrentScan() {
+				var scanIndex = probes[params.probe - 1].currentScan;
+
+				Object.keys(probes[params.probe - 1].scans[scanIndex]).forEach(key => {
+					probes[params.probe - 1].scans[scanIndex][key] = params[key];
+				});
+
+
+				var currentProbe = probes[params.probe - 1];
+				for (var j = 0; j < currentProbe.groups.length; j++) {
+					updateProbeRays(currentProbe.groups[j], currentProbe, true, false);
+				}
+				render();
+
+			}
+
+			function checkSave() {
+				clearTimeout(saveTimeout);
+
+				saveTimeout = setTimeout(
+					() => {
+						saveResultScanPlan("changementParametres");
+					},
+					5000
+				);
+			}
+
+			function updateProbes() {
+				var currentProbeConfig = getProbeConfig();
+				var currentWedgeConfig = getWedgeConfig();
+				if (currentProbeConfig == null || currentWedgeConfig == null) return;
+
+				var scanIndex = probes[params.probe - 1].currentScan;
+
+				Object.keys(probes[params.probe - 1].scans[scanIndex]).forEach(key => {
+					probes[params.probe - 1].scans[scanIndex][key] = params[key];
+				});
+
+				probeInfo.angle = toRadians(currentWedgeConfig.angle);
+				probeInfo.H = currentWedgeConfig.H;
+				probeInfo.W = currentWedgeConfig.W;
+				probeInfo.L = currentWedgeConfig.L;
+				probeInfo.X = currentWedgeConfig.X;
+				probeInfo.Y = currentWedgeConfig.Y;
+				probeInfo.Z = currentWedgeConfig.Z;
+				probeInfo.pitch = currentProbeConfig.pitch;
+				probeInfo.elevation = currentProbeConfig.elevation;
+				probeInfo.elementQuantity = currentProbeConfig.elementQuantity;
+
+				probeInfo.angle2 = toRadians(90) - probeInfo.angle;
+				probeInfo.sH = probeInfo.Z - ((probeInfo.L - probeInfo.X) * Math.tan(probeInfo.angle));
+				probeInfo.sW = probeInfo.L - ((probeInfo.H - probeInfo.sH) * Math.tan(probeInfo.angle2));
+				probeSceneInfo = {
+					width: toSceneUnits(probeInfo.L),
+					height: toSceneUnits(probeInfo.H),
+					length: toSceneUnits(probeInfo.W),
+					x: toSceneUnits(probeInfo.X),
+					y: toSceneUnits(probeInfo.Y),
+					z: toSceneUnits(probeInfo.Z),
+					pitch: toSceneUnits(probeInfo.pitch),
+					halfWidth: toSceneUnits(probeInfo.L) / 2,
+					halfHeight: toSceneUnits(probeInfo.H) / 2,
+					halfLength: toSceneUnits(probeInfo.W) / 2,
+					slopeHeight: toSceneUnits(probeInfo.sH),
+					slopeWidth: toSceneUnits(probeInfo.sW),
+					elementWidth: 0,
+					elementHeight: 0,
+					elementLength: 0
+				};
+				probeSceneInfo.elementWidth = probeSceneInfo.pitch * 0.8;
+				probeSceneInfo.elementHeight = probeSceneInfo.elementWidth * 2;
+				probeSceneInfo.elementLength = toSceneUnits(probeInfo.elevation);
+
+
+				gui.updateDisplay();
+
+				for (var i = 0; i < probes.length; i++) {
+					for (var j = 0; j < probes[i].groups.length; j++) {
+						while (probes[i].groups[j].children.length > 0) {
+							probes[i].groups[j].remove(probes[i].groups[j].children[0]);
+						}
+						scenes[j].remove(probes[i].groups[j]);
+					}
+
+				}
+
+
+				for (var i = 0; i < probes.length; i++) {
+					probes[i].groups[s2di] = drawProbe(i, s2di);
+					probes[i].groups[s2di].name = "g1";
+					probes[i].groups[s3di] = drawProbe(i, s3di);
+					probes[i].groups[s3di].name = "g2";
+
+					scenes[s2di].add(probes[i].groups[s2di]);
+					scenes[s3di].add(probes[i].groups[s3di]);
+
+					probes[i].groups[s2di].visible = params.numProbes >= (i + 1);
+					probes[i].groups[s3di].visible = params.numProbes >= (i + 1);
+
+					setUnselected(probes[i].groups[s2di], params.probe != (i + 1));
+					setUnselected(probes[i].groups[s3di], params.probe != (i + 1));
+
+				}
+
+				updateProbePos();
+			}
+
+			function updateProbeParams() {
+				var probeConfig = getProbeConfig();
+				guiFields["numElements"].max(probeConfig.elementQuantity);
+				if (params.numElements > probeConfig.elementQuantity)
+					params.numElements = probeConfig.elementQuantity;
+
+				guiFields["pulser"].max(probeConfig.elementQuantity);
+				if (params.pulser > probeConfig.elementQuantity)
+					params.pulser = probeConfig.elementQuantity;
+
+				guiFields["firstElement"].max(probeConfig.elementQuantity);
+				if (params.firstElement > probeConfig.elementQuantity)
+					params.firstElement = probeConfig.elementQuantity;
+
+                guiFields["lScanLastElement"].max(probeConfig.elementQuantity);
+                if (params.lScanLastElement > probeConfig.elementQuantity)
+                    params.lScanLastElement = probeConfig.elementQuantity;
+
+				gui.updateDisplay();
+			}
+
+			function updatePart() {
+				var half = (partConfig.partWidth / 2);
+				guiFields["indexOffset"].min(-half);
+				guiFields["indexOffset"].max(half);
+
+				if (params.indexOffset < - half)
+					params.indexOffset = -half;
+				if (params.indexOffset > half)
+					params.indexOffset = half;
+
+				partInfo.width = partConfig.partWidth;
+
+				var halfL = (partConfig.partLength / 2);
+				guiFields["scanOffset"].min(0);
+				guiFields["scanOffset"].max(partConfig.partLength);
+
+				if (params.scanOffset < 0)
+					params.scanOffset = 0;
+				if (params.scanOffset > partConfig.partLength)
+					params.scanOffset = partConfig.partLength;
+
+				partInfo.length = partConfig.partLength;
+
+				partInfo.height = partConfig.partHeight;
+
+				gui.updateDisplay();
+
+				partSceneInfo = {
+					width: toSceneUnits(partInfo.width),
+					length: toSceneUnits(partInfo.length),
+					height: toSceneUnits(partInfo.height),
+					halfWidth: toSceneUnits(partInfo.width) / 2,
+					halfHeight: toSceneUnits(partInfo.height) / 2,
+					halfLength: toSceneUnits(partInfo.length) / 2,
+					topCap: toSceneUnits(partInfo.topCap),
+					bottomCap: toSceneUnits(partInfo.bottomCap)
+				};
+
+				createPart(scenes[s3di]);
+				createPart(scenes[s2di]);
+
+				updateProbes();
+
+				render();
+			}
+
+			function setAngle() {
+				/*
+					let radians = params.startAngle * Math.PI/180;
+					var tan = Math.tan(radians);
+					var adj = boxHeight;
+					var opp = tan * adj;
+
+					scanArea1.geometry.attributes.position.array[ 9 ] = -1.8 + opp;
+					scanLine1.geometry.attributes.position.array[ 3 ] = -1.8 + opp;
+
+					scanArea2.geometry.attributes.position.array[ 9 ] = -1.8 + opp;
+					scanArea2.geometry.attributes.position.array[ 0 ] = -1.8 + (opp*2);
+
+					scanLine2.geometry.attributes.position.array[ 3 ] = -1.8 + opp;
+					scanLine2.geometry.attributes.position.array[ 0 ] = -1.8 + (opp*2);
+					scanLine2.geometry.attributes.position.array[ 12 ] = -1.8 + (opp*2);
+
+					let radiansStop = params.stopAngle * Math.PI/180;
+					var tanStop = Math.tan(radiansStop);
+					var adjStop = boxHeight;
+					var oppStop = tanStop * adjStop;
+
+					scanArea1.geometry.attributes.position.array[ 6 ] = -1.7 + oppStop;
+					scanLine1.geometry.attributes.position.array[ 6 ] = -1.7 + oppStop;
+
+					scanArea2.geometry.attributes.position.array[ 6 ] = -1.7 + oppStop;
+					scanArea2.geometry.attributes.position.array[ 3 ] = -1.7 + (oppStop*2);
+
+					scanLine2.geometry.attributes.position.array[ 6 ] = -1.7 + oppStop;
+					scanLine2.geometry.attributes.position.array[ 9 ] = -1.7 + (oppStop*2);
+
+					scanArea1.geometry.attributes.position.needsUpdate = true;
+					scanArea2.geometry.attributes.position.needsUpdate = true;
+					scanLine1.geometry.attributes.position.needsUpdate = true;
+					scanLine2.geometry.attributes.position.needsUpdate = true;
+					render();
+					*/
+			}
+
+			function createPart(scene) {
+
+				for (var i = 0; i < scene.children.length; i++) {
+					if (scene.children[i].name.startsWith("partobject")) {
+						scene.remove(scene.children[i]);
+						i--;
+					}
+				}
+
+				const boxMat = new THREE.LineBasicMaterial({ color: 0x0000ff });
+				const points = [];
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(-partSceneInfo.halfWidth, partSceneInfo.halfHeight, partSceneInfo.halfLength));
+
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				points.push(new THREE.Vector3(partSceneInfo.halfWidth, partSceneInfo.halfHeight, partSceneInfo.halfLength));
+
+
+				const prismMat = new THREE.LineBasicMaterial({ color: 0x0000ff });
+				const prismPoints = [];
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.topCap / 2.0), partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.topCap / 2.0), partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.topCap / 2.0), partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.topCap / 2.0), partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.topCap / 2.0), partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.topCap / 2.0), partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2.0), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.topCap / 2.0), partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				/*
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+
+				prismPoints.push(new THREE.Vector3((partSceneInfo.topCap /2.0), partSceneInfo.halfHeight, -partSceneInfo.halfLength ) );
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.topCap /2.0), partSceneInfo.halfHeight, -partSceneInfo.halfLength ) );
+
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.topCap /2.0), partSceneInfo.halfHeight, partSceneInfo.halfLength ) );
+
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+
+				prismPoints.push(new THREE.Vector3((partSceneInfo.topCap /2.0), partSceneInfo.halfHeight, partSceneInfo.halfLength ) );
+				prismPoints.push(new THREE.Vector3((partSceneInfo.topCap /2.0), partSceneInfo.halfHeight, -partSceneInfo.halfLength ) );
+
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3(-(partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				prismPoints.push(new THREE.Vector3((partSceneInfo.bottomCap / 2), -partSceneInfo.halfHeight, partSceneInfo.halfLength));
+				*/
+
+				const geometry = new THREE.BufferGeometry().setFromPoints(points);
+				const box = new THREE.Line(geometry, boxMat);
+				box.name = "partobject_box";
+				scene.add(box);
+
+				const prismGeometry = new THREE.BufferGeometry().setFromPoints(prismPoints);
+				const prism = new THREE.Line(prismGeometry, prismMat);
+				prism.name = "partobject_prism";
+				scene.add(prism);
+
+				const middleLineMat = new THREE.LineBasicMaterial({ color: 0xff0000 });
+				const middleLinePoints = [];
+				middleLinePoints.push(new THREE.Vector3(0, partSceneInfo.halfHeight, -partSceneInfo.halfLength));
+				middleLinePoints.push(new THREE.Vector3(0, partSceneInfo.halfHeight, partSceneInfo.halfLength));
+
+				const middleLineGeometry = new THREE.BufferGeometry().setFromPoints(middleLinePoints);
+				const middleLine = new THREE.Line(middleLineGeometry, middleLineMat);
+				middleLine.name = "partobject_middleLine";
+				scene.add(middleLine);
+			}
+
+			window.fullScreen = function () {
+				if (document.fullscreenElement) {
+					isFullScreen = true;
+					if (document.exitFullscreen) {
+						document.exitFullscreen();
+					}
+					else if (document.msexitFullscreen) {
+						document.msexitFullscreen();
+					}
+					else if (document.mozexitFullscreen) {
+						document.mozexitFullscreen();
+					}
+					else if (document.webkitexitFullscreen) {
+						document.webkitexitFullscreen();
+					}
+				} else {
+					isFullScreen = false;
+
+					let myDocument = document.documentElement;
+
+					if (myDocument.requestFullscreen) {
+						myDocument.requestFullscreen();
+					}
+					else if (myDocument.msRequestFullscreen) {
+						myDocument.msRequestFullscreen();
+					}
+					else if (myDocument.mozRequestFullScreen) {
+						myDocument.mozRequestFullScreen();
+					}
+					else if (myDocument.webkitRequestFullscreen) {
+						myDocument.webkitRequestFullscreen();
+					}
+
+
+				}
+			}
+
+			function onFullScreen() {
+				$("#btnFullScreen>i").removeClass("fa-search-plus");
+				$("#btnFullScreen>i").removeClass("fa-search-minus");
+
+				if (document.fullscreenElement) {
+					$("#container").addClass("fullscreen");
+					$("#btnFullScreen>i").addClass("fa-search-minus");
+					$("#btnFullScreen").addClass("ui-active");
+					$("#content>#content_inner").css("position", "static");
+					$("#navigation").css("display", "none");
+					$("#chrono_inner").addClass("chrono_fullscreen");
+					$("#bandeau-top-inner").css("position", "static");
+				} else {
+					$("#container").removeClass("fullscreen");
+					$("#btnFullScreen>i").addClass("fa-search-plus");
+					$("#btnFullScreen").removeClass("ui-active");
+					$("#content>#content_inner").css("position", "");
+					$("#navigation").css("display", "");
+					$("#chrono_inner").removeClass("chrono_fullscreen");
+					$("#bandeau-top-inner").css("position", "");
+				}
+				onWindowResize();
+			}
+
+			function onWindowResize() {
+				let divHeight = $("#divThree").height();
+				let divWidth = $("#divThree").width();
+
+				let innerDivWidth = getDivWidth();
+				$("#div3d").css("width", innerDivWidth + "px");
+				$("#div2d").css("width", innerDivWidth + "px");
+
+				if (!document.fullscreenElement) {
+					$(".dg.ac").css("display", "none");
+				} else {
+					$(".dg.ac").css("display", "");
+				}
+
+				const width = innerDivWidth;
+				const height2d = (divHeight * 0.35);
+				const height3d = (divHeight * 0.65);
+
+				const aspect2d = width / height2d;
+				const aspect3d = width / height3d;
+				const frustumSize2d = 4.5;
+				const frustumSize3d = 8.35;
+				cameras[s3di].left = frustumSize3d * aspect3d / -2;
+				cameras[s3di].right = frustumSize3d * aspect3d / 2;
+				cameras[s3di].top = frustumSize3d / 2;
+				cameras[s3di].bottom = frustumSize3d / -2;
+				cameras[s3di].updateProjectionMatrix();
+				cameras[s2di].left = frustumSize2d * aspect2d / -2;
+				cameras[s2di].right = frustumSize2d * aspect2d / 2;
+				cameras[s2di].top = frustumSize2d / 2;
+				cameras[s2di].bottom = frustumSize2d / -2;
+				cameras[s2di].updateProjectionMatrix();
+				renderers[s3di].setSize(width, height3d);
+				renderers[s2di].setSize(width, height2d);
+				render();
+				$("#divOverlay3d").css("top", height2d + "px");
+				$("#divOverlay2dBottom").css("top", (height2d - 36) + "px");
+
+				const el = document.getElementById("divThree");
+				const rect = el.getBoundingClientRect();
+				let top = rect.top;
+				if (top < 0) top = 0;
+				$(".dg.ac").css("top", top + "px");
+				$(".dg.ac>div>ul").css("height", (window.innerHeight - top - 20) + "px");
+			}
+
+			function getDivWidth() {
+				let winWidth = window.innerWidth;
+				let divWidth = $("#divThree").width();
+				if (document.fullscreenElement) {
+					let diff = (winWidth - divWidth) / 2;
+					diff = 400 - diff;
+					if (diff < 0) diff = 0;
+					return (divWidth - diff);
+				} else {
+					return divWidth;
+				}
+
+			}
+
+			function typeScanChanged() {
+				for (var i = 0; i < sScanElements.length; i++) {
+					if (params.typeScan == "S-Scan")
+						sScanElements[i].removeClass("display-none");
+					else
+                        sScanElements[i].addClass("display-none");
+				}
+                for (var i = 0; i < lScanElements.length; i++) {
+                    if (params.typeScan == "L-Scan")
+                        lScanElements[i].removeClass("display-none");
+                    else
+                        lScanElements[i].addClass("display-none");
+                }
+			}
+
+			function render() {
+				for (var i = 0; i < scenes.length; i++) {
+					renderers[i].render(scenes[i], cameras[i]);
+				}
+			}
+		</script>
+
+	</body>
+</html>
